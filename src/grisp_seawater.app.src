@@ -1,0 +1,16 @@
+{application, grisp_seawater, [
+    {description, "Grisp2 Seawater Client Library"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {grisp_seawater_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        grisp,
+        grisp_cryptoauth,
+        gun
+    ]},
+    {env, []},
+    {modules, []},
+    {links, []}
+]}.
