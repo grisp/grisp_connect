@@ -84,7 +84,8 @@ server_chain(ServerName) ->
     load_cert_chain(["server", ServerName]).
 
 client_chain() ->
-    ClientCert = grisp_cryptoauth:read_cert(primary, der),
+    Templates = [{{2, 0}, {grisp_seawater_cert, grisp2_device}}],
+    ClientCert = grisp_cryptoauth:read_cert(primary, Templates, der),
     {ok, IssuerId} = public_key:pkix_issuer_id(ClientCert, self),
     case client_chain_issuer(IssuerId) of
         {error, _Reason} = Error -> Error;

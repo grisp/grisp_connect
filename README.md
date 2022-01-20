@@ -1,7 +1,7 @@
 grisp_seawater
-==================
+==============
 
-Grisp2 Seawater Client Library
+GRiSP2 Seawater Client Library
 
 
 Build
@@ -24,25 +24,6 @@ validation to succeed. This can be done with the command:
 e.g.
 
     grisp_rtems:clock_set({{{2022, 1, 18}, {12, 09, 42}}, 0}).
-
-
-### Crypto Configuration
-
-The cryptografic library need to be configured by adding this to your
-application `sys.config`:
-
-    {grisp_cryptoauth, [
-        {device, #{
-            type => 'ATECC608B',
-            i2c_bus => 0,
-            i2c_address => 16#6C
-        }},
-        {templates, [
-            {{0, 0}, stritzinger_root},
-            {{1, 0}, grisp2_intermediate},
-            {{2, 0}, grisp2_device}
-        ]}
-    ]}
 
 
 Basic Low Level API Usage
