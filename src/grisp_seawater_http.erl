@@ -21,6 +21,7 @@
 
 %--- API Functions -------------------------------------------------------------
 
+%open() -> open("seawater.fly.dev", 443).
 open() -> open("seawater.stritzinger.com", 443).
 
 open(ServerName, Port) ->
@@ -64,20 +65,16 @@ ssl_opts(ServerName) ->
     case client_chain() of
         {error, _Reason} = Error -> Error;
         {ok, ClientChain} ->
-            case server_chain(ServerName) of
-                {error, _Reason} = Error -> Error;
-                {ok, ServerChain} ->
-                    {ok, [
-                        {server_name_indication, ServerName},
-                        {verify, verify_peer},
-                        {cacerts, ServerChain},
-                        {cert, ClientChain},
-                        {key, #{
-                            algorithm => ecdsa,
-                            sign_fun => {grisp_cryptoauth, sign_fun}
-                        }}
-                    ]}
-            end
+            {ok, [
+                %{server_name_indication, ServerName},
+                {verify, verify_none},
+                %{cacerts, ServerChain},
+                {cert, ClientChain},
+                {key, #{
+                    algorithm => ecdsa,
+                    sign_fun => {grisp_cryptoauth, sign_fun}
+                }}
+            ]}
     end.
 
 server_chain(ServerName) ->

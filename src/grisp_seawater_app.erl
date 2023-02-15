@@ -17,6 +17,7 @@
 %--- Behaviour application Callback Functions ----------------------------------
 
 start(_StartType, _StartArgs) ->
+    grisp_rtems:clock_set({{{2022, 1, 18}, {12, 09, 42}}, 0}),
     grisp_seawater_sup:start_link().
 
 stop(_State) ->

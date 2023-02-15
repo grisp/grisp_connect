@@ -1,0 +1,14 @@
+%--- Erlang Inet Configuration -------------------------------------------------
+
+% Add hosts
+{host, {149,248,205,211}, ["seawater.fly.dev"]}.
+{host, {46,101,169,235},  ["seawater.stritzinger.com"]}.
+
+% Do not monitor the hosts file
+{hosts_file, ""}.
+
+% Disable caching
+{cache_size, 0}.
+
+% Specify lookup method
+{lookup, [file, dns]}.
