@@ -10,22 +10,6 @@ Build
     $ rebar3 compile
 
 
-Prerequisites
--------------
-
-### Time
-
-
-The Grisp board time must be set and correct for the certificate expiration
-validation to succeed. This can be done with the command:
-
-    grisp_rtems:clock_set({{{YYYY, MM, DD}, {HH, MM, SS}}, MICRO}).
-
-e.g.
-
-    grisp_rtems:clock_set({{{2022, 1, 18}, {12, 09, 42}}, 0}).
-
-
 Basic Low Level API Usage
 -------------------------
 
