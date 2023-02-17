@@ -9,6 +9,7 @@
         stdlib,
         grisp,
         grisp_cryptoauth,
+        certifi,
         gun
     ]},
     {env, []},

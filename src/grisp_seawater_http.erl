@@ -66,9 +66,9 @@ ssl_opts(ServerName) ->
         {error, _Reason} = Error -> Error;
         {ok, ClientChain} ->
             {ok, [
-                %{server_name_indication, ServerName},
-                {verify, verify_none},
-                %{cacerts, ServerChain},
+                {verify, verify_peer},
+                {depth, 99},
+                {cacerts, certifi:cacerts() ++ server_chain(ServerName)},
                 {cert, ClientChain},
                 {key, #{
                     algorithm => ecdsa,
@@ -77,15 +77,18 @@ ssl_opts(ServerName) ->
             ]}
     end.
 
-server_chain(ServerName) ->
-    load_cert_chain(["server", ServerName]).
-
 client_chain() ->
     ClientCert = grisp_cryptoauth:read_cert(primary, der),
     {ok, IssuerId} = public_key:pkix_issuer_id(ClientCert, self),
     case client_chain_issuer(IssuerId) of
         {error, _Reason} = Error -> Error;
         {ok, Chain} -> {ok, [ClientCert | Chain]}
+    end.
+
+server_chain(ServerName) ->
+    case load_cert_chain(["server", ServerName]) of
+        {error, _} -> [];
+        {ok, List} -> List
     end.
 
 client_chain_issuer({Serial, _}) when Serial >= 1000 ->
