@@ -21,6 +21,7 @@
 
 %--- API Functions -------------------------------------------------------------
 
+%open() -> open("seawater.fly.dev", 443).
 open() -> open("seawater.stritzinger.com", 443).
 
 open(ServerName, Port) ->
@@ -64,24 +65,17 @@ ssl_opts(ServerName) ->
     case client_chain() of
         {error, _Reason} = Error -> Error;
         {ok, ClientChain} ->
-            case server_chain(ServerName) of
-                {error, _Reason} = Error -> Error;
-                {ok, ServerChain} ->
-                    {ok, [
-                        {server_name_indication, ServerName},
-                        {verify, verify_peer},
-                        {cacerts, ServerChain},
-                        {cert, ClientChain},
-                        {key, #{
-                            algorithm => ecdsa,
-                            sign_fun => {grisp_cryptoauth, sign_fun}
-                        }}
-                    ]}
-            end
+            {ok, [
+                {verify, verify_peer},
+                {depth, 99},
+                {cacerts, certifi:cacerts() ++ server_chain(ServerName)},
+                {cert, ClientChain},
+                {key, #{
+                    algorithm => ecdsa,
+                    sign_fun => {grisp_cryptoauth, sign_fun}
+                }}
+            ]}
     end.
-
-server_chain(ServerName) ->
-    load_cert_chain(["server", ServerName]).
 
 client_chain() ->
     ClientCert = grisp_cryptoauth:read_cert(primary, der),
@@ -89,6 +83,12 @@ client_chain() ->
     case client_chain_issuer(IssuerId) of
         {error, _Reason} = Error -> Error;
         {ok, Chain} -> {ok, [ClientCert | Chain]}
+    end.
+
+server_chain(ServerName) ->
+    case load_cert_chain(["server", ServerName]) of
+        {error, _} -> [];
+        {ok, List} -> List
     end.
 
 client_chain_issuer({Serial, _}) when Serial >= 1000 ->

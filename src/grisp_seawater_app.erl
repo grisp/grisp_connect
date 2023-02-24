@@ -17,6 +17,7 @@
 %--- Behaviour application Callback Functions ----------------------------------
 
 start(_StartType, _StartArgs) ->
+    grisp_seawater_ntp:set_current_time(),
     grisp_seawater_sup:start_link().
 
 stop(_State) ->

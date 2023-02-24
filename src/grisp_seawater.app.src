@@ -5,9 +5,11 @@
     {mod, {grisp_seawater_app, []}},
     {applications, [
         kernel,
+        inets,
         stdlib,
         grisp,
         grisp_cryptoauth,
+        certifi,
         gun
     ]},
     {env, []},
