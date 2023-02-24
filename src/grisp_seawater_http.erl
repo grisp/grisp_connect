@@ -14,11 +14,6 @@
 -export([get/2]).
 
 
-%--- Records -------------------------------------------------------------------
-
--record(?MODULE, {conn}).
-
-
 %--- API Functions -------------------------------------------------------------
 
 %open() -> open("seawater.fly.dev", 443).
@@ -28,24 +23,27 @@ open(ServerName, Port) ->
     case ssl_opts(ServerName) of
         {error, _Reason} = Error -> Error;
         {ok, TransOpts} ->
-            GunOpts = #{transport => tls, transport_opts => TransOpts},
+            GunOpts = #{
+                    protocols => [http],
+                    transport => tls,
+                    tls_opts => TransOpts},
             case gun:open(ServerName, Port, GunOpts) of
                 {error, _Reason} = Error -> Error;
                 {ok, Conn} ->
                     erlang:link(Conn),
                     case gun:await_up(Conn) of
                         {error, _Reason} = Error -> Error;
-                        {ok, _} -> {ok, #?MODULE{conn = Conn}}
+                        {ok, _} -> {ok, Conn}
                     end
             end
     end.
 
-close(#?MODULE{conn = Conn}) ->
+close(Conn) ->
     erlang:unlink(Conn),
     gun:shutdown(Conn),
     ok.
 
-get(#?MODULE{conn = Conn}, Path) ->
+get(Conn, Path) ->
     StreamRef = gun:get(Conn, Path),
     case gun:await(Conn, StreamRef) of
         {error, _Reason} = Error -> Error;

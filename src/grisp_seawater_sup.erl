@@ -32,9 +32,12 @@ start_link() ->
 
 init([]) ->
     SupFlags = #{
-        strategy => one_for_all,
-        intensity => 0,
-        period => 1
+        strategy => one_for_all
     },
-    ChildSpecs = [],
+    ChildSpecs = [worker(grisp_seawater_client, [])],
     {ok, {SupFlags, ChildSpecs}}.
+
+%% internal functions
+
+worker(Module, Args) ->
+    #{id => Module, start => {Module, start_link, Args}, type => worker}.

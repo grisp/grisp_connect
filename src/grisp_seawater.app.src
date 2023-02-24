@@ -10,7 +10,8 @@
         grisp,
         grisp_cryptoauth,
         certifi,
-        gun
+        gun,
+        jsx
     ]},
     {env, []},
     {modules, []},
