@@ -35,9 +35,9 @@ decode(Term) ->
 encode([Message]) ->
     encode(Message);
 encode(Messages) when is_list(Messages) ->
-    map_to_json([pack(M) || M <- Messages]);
+    term_to_json([pack(M) || M <- Messages]);
 encode(Message) ->
-    map_to_json(pack(Message)).
+    term_to_json(pack(Message)).
 
 format_error({internal_error, parse_error, ID}) ->
     {error, -32700, <<"Parse error">>, undefined, ID};
@@ -115,5 +115,56 @@ json_to_term(Bin) ->
         error:E -> {error, E}
     end.
 
-map_to_json(Map) ->
+term_to_json(Map) ->
     jsx:encode(Map).
+
+-ifdef(EUNIT).
+-include_lib("eunit/include/eunit.hrl").
+
+positional_parameters_test() ->
+    Term = {request, <<"subtract">>, [42,23], 1},
+    Json = <<"{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"subtract\",\"params\":[42,23]}">>,
+    ?assertMatch(Json, encode(Term)),
+    ?assertMatch({single, Term}, decode(Json)).
+
+named_parameters_test() ->
+    Term = {request, <<"subtract">>, #{<<"subtrahend">> => 23, <<"minuend">> => 42}, 2},
+    Json = <<"{\"id\":2,\"jsonrpc\":\"2.0\",\"method\":\"subtract\",\"params\":{\"minuend\":42,\"subtrahend\":23}}">>,
+    ?assertMatch(Json, encode(Term)),
+    ?assertMatch({single, Term}, decode(Json)).
+
+notification_test() ->
+    Term = {notification, <<"update">>, [1,2,3,4,5]},
+    Json = <<"{\"jsonrpc\":\"2.0\",\"method\":\"update\",\"params\":[1,2,3,4,5]}">>,
+    ?assertMatch(Json, encode(Term)),
+    ?assertMatch({single, Term}, decode(Json)).
+
+invalid_json_test() ->
+    Term = {internal_error, parse_error, null},
+    Json = <<"{\"jsonrpc\":\"2.0\",\"method\":\"foobar,\"params\":\"bar\",\"baz]">>,
+    ?assertMatch({single, Term}, decode(Json)),
+    JsonError = <<"{\"error\":{\"code\":-32700,\"message\":\"Parse error\"},\"id\":null,\"jsonrpc\":\"2.0\"}">>,
+    ?assertMatch(JsonError, encode(format_error(Term))).
+
+invalid_request_test() ->
+    Term = {internal_error, invalid_request, null},
+    Json = <<"{\"jsonrpc\":\"2.0\",\"method\":1,\"params\":\"bar\"}">>,
+    ?assertMatch({single, Term}, decode(Json)),
+    JsonError = <<"{\"error\":{\"code\":-32600,\"message\":\"Invalid request\"},\"id\":null,\"jsonrpc\":\"2.0\"}">>,
+    ?assertMatch(JsonError, encode(format_error(Term))).
+
+batch_test() ->
+    Term1 = {request, <<"sum">>, [1,2,4], <<"1">>},
+    Term2 = {internal_error, invalid_request, null},
+    Json = <<"[{\"jsonrpc\":\"2.0\",\"method\":\"sum\",\"params\":[1,2,4],\"id\":\"1\"},{\"foo\":\"boo\"}]">>,
+    ?assertMatch({batch, [Term1,Term2]}, decode(Json)),
+    JsonError = <<"[{\"id\":\"1\",\"jsonrpc\":\"2.0\",\"method\":\"sum\",\"params\":[1,2,4]},{\"error\":{\"code\":-32600,\"message\":\"Invalid request\"},\"id\":null,\"jsonrpc\":\"2.0\"}]">>,
+    ?assertMatch(JsonError, encode([Term1,format_error(Term2)])).
+
+result_test() ->
+    Term = {result, 7, 45},
+    Json = <<"{\"id\":45,\"jsonrpc\":\"2.0\",\"result\":7}">>,
+    ?assertMatch(Json, encode(Term)),
+    ?assertMatch({single, Term}, decode(Json)).
+
+-endif.
