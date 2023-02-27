@@ -32,6 +32,8 @@ decode(Term) ->
             {single, {internal_error, parse_error, null}}
     end.
 
+encode([Message]) ->
+    encode(Message);
 encode(Messages) when is_list(Messages) ->
     map_to_json([ pack(M) || M <- Messages]);
 encode(Message) ->

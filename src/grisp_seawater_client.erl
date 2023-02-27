@@ -61,7 +61,6 @@ handle_info({gun_ws, Conn, Stream, {text, JSON}},
     case handle_jsonrpc(JSON_RPC) of
         [] -> ok;
         Msgs ->
-            ?LOG_DEBUG("JsonRPC reply: ~p",[Msgs]),
             Text = grisp_seawater_jsonrpc:encode(Msgs),
             gun:ws_send(S#state.http_conn, S#state.ws_stream, {text, Text})
     end,
