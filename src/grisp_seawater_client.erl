@@ -41,7 +41,7 @@ handle_call({connect, Server, Port}, _, #state{http_conn = undefined} = S) ->
         {ok, Conn} ->
             case upgrade(Conn) of
                 {ok, WsStream} ->
-                    {reply,  ok, #state{http_conn = Conn, ws_stream = WsStream}};
+                    {reply, ok, #state{http_conn = Conn, ws_stream = WsStream}};
                 Error ->
                     ok = grisp_seawater_http:close(Conn),
                     {reply, Error, S}

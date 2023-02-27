@@ -21,7 +21,7 @@
 %--- API ----------------------------------------------------------------------
 
 decode(Term) ->
-    case json_to_map(Term) of
+    case json_to_term(Term) of
         [] ->
             {single, {internal_error, invalid_request, null}};
         Messages when is_list(Messages) ->
@@ -35,7 +35,7 @@ decode(Term) ->
 encode([Message]) ->
     encode(Message);
 encode(Messages) when is_list(Messages) ->
-    map_to_json([ pack(M) || M <- Messages]);
+    map_to_json([pack(M) || M <- Messages]);
 encode(Message) ->
     map_to_json(pack(Message)).
 
@@ -105,11 +105,11 @@ pack({error, Code, Message, Data, undefined}) ->
 pack({error, Code, Message, Data, ID}) ->
     #{?V, error => #{code => Code, message => Message, data => Data}, id => ID}.
 
-id(Object) when is_map(Object) -> maps:get(id, Object, undefined);
-id(_Object) -> undefined.
+id(Object) when is_map(Object) -> maps:get(id, Object, null);
+id(_Object) -> null.
 
 
-json_to_map(Bin) ->
+json_to_term(Bin) ->
     try jsx:decode(Bin, [{labels, attempt_atom}, return_maps])
     catch
         error:E -> {error, E}
