@@ -34,7 +34,9 @@ init([]) ->
     SupFlags = #{
         strategy => one_for_all
     },
-    ChildSpecs = [worker(grisp_seawater_client, [])],
+    ChildSpecs = [
+        worker(grisp_seawater_ntp, []),
+        worker(grisp_seawater_client, [])],
     {ok, {SupFlags, ChildSpecs}}.
 
 %% internal functions
