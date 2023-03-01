@@ -4,6 +4,7 @@
 -export([connect/0]).
 -export([connect/2]).
 -export([link_device/1]).
+-export([ping/0]).
 
 -behaviour(gen_server).
 
@@ -36,6 +37,9 @@ connect(Server, Port) ->
 link_device(Token) ->
     gen_server:call(?MODULE, {?FUNCTION_NAME, Token}).
 
+ping() ->
+    gen_server:call(?MODULE, ?FUNCTION_NAME).
+
 % gen_server callbacks -----------------------------
 
 init([]) ->
@@ -59,6 +63,9 @@ handle_call({connect, _Server, _Port}, _,  S) ->
 handle_call(_, _,  #state{http_conn = C, ws_stream = Stream} = S)
 when  C == undefined orelse Stream == undefined ->
     {reply, {error, disconnected}, S};
+handle_call(ping, From, S) ->
+    {ok, NewS} = make_request(From, post, ping, #{}, S),
+    {noreply, NewS};
 handle_call({link_device, Token}, From, S) ->
     {ok, NewS} = make_request(From, post, device_linking_token, #{token => Token}, S),
     {noreply, NewS}.
