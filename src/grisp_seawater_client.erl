@@ -124,10 +124,10 @@ handle_rpc_messages([{request, M, Params, ID} | Batch], Replies , S)
         when M == <<"post">> ->
     handle_rpc_messages(Batch, [handle_request(M, Params, ID) | Replies], S);
 handle_rpc_messages([{result, _, _} = Res| Batch], Replies, S) ->
-    handle_rpc_messages(Batch, Replies, handle_result(Res, S));
+    handle_rpc_messages(Batch, Replies, handle_responce(Res, S));
 handle_rpc_messages([{error, _Code, _Msg, _Data, _ID} = E | Batch], Replies, S) ->
     ?LOG_DEBUG("Received JsonRPC error: ~p",[E]),
-    handle_rpc_messages(Batch, Replies, S);
+    handle_rpc_messages(Batch, Replies, handle_responce(E, S));
 handle_rpc_messages([{internal_error, _, _} = E | Batch], Replies, S) ->
     ?LOG_ERROR("JsonRPC: ~p",[E]),
     handle_rpc_messages(Batch, [grisp_seawater_jsonrpc:format_error(E)| Replies], S).
@@ -148,13 +148,17 @@ make_request(Caller, Method, Type, Params, #state{requests = Reqs} = State) ->
     Request = {Caller, TRef},
     {ok, State#state{requests = Reqs#{ID => Request}}}.
 
-handle_result({result, R, ID} = Res, #state{requests = Requests} = S) ->
+handle_responce(Responce, #state{requests = Requests} = S) ->
+    {Reply, ID} = case Responce of
+        {result, R, _ID} -> {R, _ID};
+        {error, _Code, Msg, _Data, _ID} -> {Msg, _ID}
+    end,
     case maps:get(ID, Requests) of
         {Caller, Tref} ->
             erlang:cancel_timer(Tref),
-            gen_server:reply(Caller, R);
+            gen_server:reply(Caller, Reply);
         _ ->
-            ?LOG_ERROR("Unexpected jsonrpc ~p",[Res])
+            ?LOG_ERROR("Unexpected jsonrpc ~p",[Responce])
     end,
     S#state{requests = maps:remove(ID, Requests)}.
 
@@ -166,3 +170,4 @@ flash(Led, Color) ->
         grisp_led:off(Led)
     end),
     ok.
+
