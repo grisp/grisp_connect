@@ -3,6 +3,7 @@
 -export([start_link/0]).
 -export([connect/0]).
 -export([connect/2]).
+-export([link_device/0]).
 -export([link_device/1]).
 -export([ping/0]).
 
@@ -33,6 +34,12 @@ connect() ->
 
 connect(Server, Port) ->
     gen_server:call(?MODULE, {?FUNCTION_NAME, Server, Port}, 60_000).
+
+link_device() ->
+    case application:get_env(grisp_seawater, device_linking_token) of
+        undefined -> {error, token_undefined};
+        {ok, Token} -> link_device(Token)
+    end.
 
 link_device(Token) ->
     gen_server:call(?MODULE, {?FUNCTION_NAME, Token}).
