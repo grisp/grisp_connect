@@ -138,8 +138,9 @@ handle_rpc_messages([{internal_error, _, _} = E | Batch], Replies, S) ->
 
 handle_request(<<"post">>, #{type := <<"flash">>} = Params, ID) ->
     Led = maps:get(led, Params, 1),
-    Color = maps:get(color, Params, red),
-    {result, flash(Led, Color), ID};
+    Color = maps:get(color, Params, <<"red">>),
+    Millis = maps:get(time, Params, 100),
+    {result, flash(Led, Color, Millis), ID};
 handle_request(_, _, ID) ->
     grisp_seawater_jsonrpc:format_error({internal_error, method_not_found, ID}).
 
@@ -166,11 +167,15 @@ handle_response(Response, #state{requests = Requests} = S) ->
     end,
     S#state{requests = maps:remove(ID, Requests)}.
 
-flash(Led, Color) ->
+flash(Led, Color, Millis) ->
     spawn(fun() ->
         io:format("Flash from Seawater!~n"),
-        grisp_led:color(Led, Color),
-        timer:sleep(100),
+        grisp_led:color(Led, color_atom(Color)),
+        timer:sleep(Millis),
         grisp_led:off(Led)
     end),
     ok.
+
+color_atom(<<"red">>) -> red;
+color_atom(<<"green">>) -> green;
+color_atom(<<"blue">>) -> blue.
