@@ -92,8 +92,12 @@ handle_info({timeout, TRef, ID}, #state{requests = Reqs} = State) ->
         _ -> error(unexpected_timeout)
     end;
 handle_info({gun_down, C, ws, closed, [Stream]},
-            #state{http_conn = C, ws_stream = Stream}) ->
+            #state{http_conn = C, ws_stream = Stream, requests = Requests}) ->
     grisp_seawater_http:close(C),
+    [begin
+        erlang:cancel_timer(Tref),
+        gen_server:reply(Caller, {error, ws_closed})
+     end || {Caller, Tref} <- maps:values(Requests)],
     {noreply, #state{}};
 handle_info(M, S) ->
     ?LOG_WARNING("Unandled WS message: ~p", [M]),
