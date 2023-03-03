@@ -162,7 +162,8 @@ make_request(Caller, Method, Type, Params, #state{requests = Reqs} = State) ->
 handle_response(Response, #state{requests = Requests} = S) ->
     {Reply, ID} = case Response of
         {result, Result, ID0} -> {{ok, Result}, ID0};
-        {error, _Code, Message, Data, ID0} -> {{error, Message, Data}, ID0}
+        {error, Code, Message, Data, ID0} ->
+            {{error, error_atom(Code), Message, Data}, ID0}
     end,
     case maps:get(ID, Requests) of
         {Caller, Tref} ->
@@ -181,3 +182,9 @@ flash(Led, Color) ->
         grisp_led:off(Led)
     end),
     ok.
+
+error_atom(-1) -> device_not_linked;
+error_atom(-2) -> token_expired;
+error_atom(-3) -> device_already_linked;
+error_atom(-4) -> invalid_token;
+error_atom(_)  -> jsonrpc_error.
