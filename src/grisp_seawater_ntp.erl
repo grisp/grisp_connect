@@ -10,8 +10,11 @@
 -define(NTP_PORT,       123).                   % udp
 -define(SERVER_TIMEOUT, 5000).                  % ms
 -define(EPOCH,          2208988800).            % offset yr 1900 to unix epochù
+-define(RETRY_TIMEOUT, 1000).
 
 -include_lib("kernel/include/logger.hrl").
+
+
 
 % API
 
@@ -45,20 +48,18 @@ handle_event({call, From}, {get_time, Host}, ready, Data) ->
     {keep_state, Data, [{reply, From, do_get_time(Host)}]};
 
 handle_event(enter, _OldState, waiting_ip, Data) ->
-    {next_state, waiting_ip, Data,
-        [{state_timeout, 1000, retry}]};
+    {next_state, waiting_ip, Data, [{state_timeout, ?RETRY_TIMEOUT, retry}]};
 handle_event(state_timeout, retry, waiting_ip, Data) ->
     case check_inet_ipv4() of
         true ->
             ?LOG_INFO("ip detected, tryng to contact ntp server..."),
             {next_state, waiting_server, Data};
         false ->
-            {next_state, waiting_ip, Data}
+            {next_state, waiting_ip, Data, [{state_timeout, ?RETRY_TIMEOUT, retry}]}
     end;
 
 handle_event(enter, _OldState, waiting_server, Data) ->
-    {next_state, waiting_server, Data,
-        [{state_timeout, 1000, retry}]};
+    {next_state, waiting_server, Data, [{state_timeout, ?RETRY_TIMEOUT, retry}]};
 handle_event(state_timeout, retry, waiting_server, Data) ->
     try
         set_current_time(),
@@ -67,7 +68,7 @@ handle_event(state_timeout, retry, waiting_server, Data) ->
     catch
         Ex:Er ->
             ?LOG_ERROR("ntp request failed: ~p, ~p",[Ex,Er]),
-            {next_state, waiting_server, Data}
+            {next_state, waiting_server, Data, [{state_timeout, ?RETRY_TIMEOUT, retry}]}
     end;
 
 handle_event( E, OldS, NewS, Data) ->
