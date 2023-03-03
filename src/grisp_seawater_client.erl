@@ -60,8 +60,8 @@ handle_call({connect, Server, Port}, _, #state{http_conn = undefined} = S) ->
     end;
 handle_call({connect, _Server, _Port}, _,  S) ->
     {reply, already_connected, S};
-handle_call(_, _,  #state{http_conn = C, ws_stream = Stream} = S)
-when  C == undefined orelse Stream == undefined ->
+handle_call(_, _, #state{http_conn = Conn, ws_stream = Stream} = S)
+when Conn == undefined orelse Stream == undefined ->
     {reply, {error, disconnected}, S};
 handle_call(ping, From, S) ->
     {ok, NewS} = make_request(From, post, ping, #{}, S),
@@ -91,7 +91,7 @@ handle_info({timeout, TRef, ID}, #state{requests = Reqs} = State) ->
             {noreply, NewS};
         _ -> error(unexpected_timeout)
     end;
-handle_info({gun_down, C, ws,closed, [Stream]},
+handle_info({gun_down, C, ws, closed, [Stream]},
             #state{http_conn = C, ws_stream = Stream}) ->
     grisp_seawater_http:close(C),
     {noreply, #state{}};
@@ -121,13 +121,13 @@ handle_jsonrpc({single, Rpc}, S) ->
 
 handle_rpc_messages([], Replies , S) -> {lists:reverse(Replies), S};
 handle_rpc_messages([{request, M, Params, ID} | Batch], Replies , S)
-        when M == <<"post">> ->
+when M == <<"post">> ->
     handle_rpc_messages(Batch, [handle_request(M, Params, ID) | Replies], S);
 handle_rpc_messages([{result, _, _} = Res| Batch], Replies, S) ->
-    handle_rpc_messages(Batch, Replies, handle_responce(Res, S));
+    handle_rpc_messages(Batch, Replies, handle_response(Res, S));
 handle_rpc_messages([{error, _Code, _Msg, _Data, _ID} = E | Batch], Replies, S) ->
     ?LOG_DEBUG("Received JsonRPC error: ~p",[E]),
-    handle_rpc_messages(Batch, Replies, handle_responce(E, S));
+    handle_rpc_messages(Batch, Replies, handle_response(E, S));
 handle_rpc_messages([{internal_error, _, _} = E | Batch], Replies, S) ->
     ?LOG_ERROR("JsonRPC: ~p",[E]),
     handle_rpc_messages(Batch, [grisp_seawater_jsonrpc:format_error(E)| Replies], S).
@@ -148,17 +148,17 @@ make_request(Caller, Method, Type, Params, #state{requests = Reqs} = State) ->
     Request = {Caller, TRef},
     {ok, State#state{requests = Reqs#{ID => Request}}}.
 
-handle_responce(Responce, #state{requests = Requests} = S) ->
-    {Reply, ID} = case Responce of
-        {result, R, _ID} -> {R, _ID};
-        {error, _Code, Msg, _Data, _ID} -> {Msg, _ID}
+handle_response(Response, #state{requests = Requests} = S) ->
+    {Reply, ID} = case Response of
+        {result, Result, ID0} -> {{ok, Result}, ID0};
+        {error, _Code, Message, Data, ID0} -> {{error, Message, Data}, ID0}
     end,
     case maps:get(ID, Requests) of
         {Caller, Tref} ->
             erlang:cancel_timer(Tref),
             gen_server:reply(Caller, Reply);
         _ ->
-            ?LOG_ERROR("Unexpected jsonrpc ~p",[Responce])
+            ?LOG_ERROR("Unexpected jsonrpc ~p",[Response])
     end,
     S#state{requests = maps:remove(ID, Requests)}.
 
@@ -170,4 +170,3 @@ flash(Led, Color) ->
         grisp_led:off(Led)
     end),
     ok.
-
