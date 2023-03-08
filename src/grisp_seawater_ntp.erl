@@ -55,11 +55,13 @@ handle_event(state_timeout, retry, waiting_ip, Data) ->
             ?LOG_INFO("ip detected, tryng to contact ntp server..."),
             {next_state, waiting_server, Data};
         false ->
-            {next_state, waiting_ip, Data, [{state_timeout, ?RETRY_TIMEOUT, retry}]}
+            {next_state, waiting_ip, Data,
+                                    [{state_timeout, ?RETRY_TIMEOUT, retry}]}
     end;
 
 handle_event(enter, _OldState, waiting_server, Data) ->
-    {next_state, waiting_server, Data, [{state_timeout, ?RETRY_TIMEOUT, retry}]};
+    {next_state, waiting_server, Data,
+                                [{state_timeout, ?RETRY_TIMEOUT, retry}]};
 handle_event(state_timeout, retry, waiting_server, Data) ->
     try
         set_current_time(),
@@ -68,7 +70,8 @@ handle_event(state_timeout, retry, waiting_server, Data) ->
     catch
         Ex:Er ->
             ?LOG_ERROR("ntp request failed: ~p, ~p",[Ex,Er]),
-            {next_state, waiting_server, Data, [{state_timeout, ?RETRY_TIMEOUT, retry}]}
+            {next_state, waiting_server, Data,
+                                    [{state_timeout, ?RETRY_TIMEOUT, retry}]}
     end;
 
 handle_event( E, OldS, NewS, Data) ->
@@ -104,18 +107,20 @@ ntp_request(Host, Binary) ->
 process_ntp_response(Ntp_response) ->
     <<LI:2, Version:3, Mode:3, Stratum:8, Poll:8/signed, Precision:8/signed,
         RootDel:32, RootDisp:32, R1:8, R2:8, R3:8, R4:8, RtsI:32, RtsF:32,
-        OtsI:32, OtsF:32,   RcvI:32, RcvF:32, XmtI:32, XmtF:32 >> = Ntp_response,
+        OtsI:32, OtsF:32, RcvI:32, RcvF:32, XmtI:32, XmtF:32>> = Ntp_response,
   {NowMS, NowS, NowUS} = erlang:timestamp(),
   NowTimestamp = NowMS * 1.0e6 + NowS + NowUS/1000,
   TransmitTimestamp = XmtI - ?EPOCH + binfrac(XmtF),
-    {{li, LI}, {vn, Version}, {mode, Mode}, {stratum, Stratum}, {poll, Poll}, {precision, Precision},
-        {rootDelay, RootDel}, {rootDispersion, RootDisp}, {referenceId, R1, R2, R3, R4},
+    {{li, LI}, {vn, Version}, {mode, Mode}, {stratum, Stratum},
+        {poll, Poll}, {precision, Precision},
+        {rootDelay, RootDel}, {rootDispersion, RootDisp},
+        {referenceId, R1, R2, R3, R4},
         {referenceTimestamp, RtsI - ?EPOCH + binfrac(RtsF)},
         {originateTimestamp, OtsI - ?EPOCH + binfrac(OtsF)},
         {receiveTimestamp,   RcvI - ?EPOCH + binfrac(RcvF)},
         {transmitTimestamp,  TransmitTimestamp},
         {clientReceiveTimestamp, NowTimestamp},
-        {offset, TransmitTimestamp - NowTimestamp} }.
+        {offset, TransmitTimestamp - NowTimestamp}}.
 
 create_ntp_request() ->
     << 0:2, 4:3, 3:3,  0:(3*8 + 3*32 + 4*64) >>.

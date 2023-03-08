@@ -74,7 +74,8 @@ handle_call(ping, From, S) ->
     {ok, NewS} = make_request(From, post, ping, #{}, S),
     {noreply, NewS};
 handle_call({link_device, Token}, From, S) ->
-    {ok, NewS} = make_request(From, post, device_linking_token, #{token => Token}, S),
+    {ok, NewS} = make_request(From, post, device_linking_token,
+                              #{token => Token}, S),
     {noreply, NewS}.
 
 handle_cast(connect, S) ->
@@ -136,12 +137,14 @@ when M == <<"post">> ->
     handle_rpc_messages(Batch, [handle_request(M, Params, ID) | Replies], S);
 handle_rpc_messages([{result, _, _} = Res| Batch], Replies, S) ->
     handle_rpc_messages(Batch, Replies, handle_response(Res, S));
-handle_rpc_messages([{error, _Code, _Msg, _Data, _ID} = E | Batch], Replies, S) ->
+handle_rpc_messages([{error, _Code, _Msg, _Data, _ID} = E | Batch],
+                    Replies, S) ->
     ?LOG_DEBUG("Received JsonRPC error: ~p",[E]),
     handle_rpc_messages(Batch, Replies, handle_response(E, S));
 handle_rpc_messages([{internal_error, _, _} = E | Batch], Replies, S) ->
     ?LOG_ERROR("JsonRPC: ~p",[E]),
-    handle_rpc_messages(Batch, [grisp_seawater_jsonrpc:format_error(E)| Replies], S).
+    handle_rpc_messages(Batch,
+                        [grisp_seawater_jsonrpc:format_error(E)| Replies], S).
 
 handle_request(<<"post">>, #{type := <<"flash">>} = Params, ID) ->
     Led = maps:get(led, Params, 1),
