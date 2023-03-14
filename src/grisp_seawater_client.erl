@@ -74,7 +74,8 @@ handle_call(ping, From, S) ->
     {ok, NewS} = make_request(From, post, ping, #{}, S),
     {noreply, NewS};
 handle_call({link_device, Token}, From, S) ->
-    {ok, NewS} = make_request(From, post, device_linking_token, #{token => Token}, S),
+    {ok, NewS} = make_request(From, post, device_linking_token,
+                              #{token => Token}, S),
     {noreply, NewS}.
 
 handle_cast(connect, S) ->
@@ -136,12 +137,14 @@ when M == <<"post">> ->
     handle_rpc_messages(Batch, [handle_request(M, Params, ID) | Replies], S);
 handle_rpc_messages([{result, _, _} = Res| Batch], Replies, S) ->
     handle_rpc_messages(Batch, Replies, handle_response(Res, S));
-handle_rpc_messages([{error, _Code, _Msg, _Data, _ID} = E | Batch], Replies, S) ->
+handle_rpc_messages([{error, _Code, _Msg, _Data, _ID} = E | Batch],
+                    Replies, S) ->
     ?LOG_DEBUG("Received JsonRPC error: ~p",[E]),
     handle_rpc_messages(Batch, Replies, handle_response(E, S));
 handle_rpc_messages([{internal_error, _, _} = E | Batch], Replies, S) ->
     ?LOG_ERROR("JsonRPC: ~p",[E]),
-    handle_rpc_messages(Batch, [grisp_seawater_jsonrpc:format_error(E)| Replies], S).
+    handle_rpc_messages(Batch,
+                        [grisp_seawater_jsonrpc:format_error(E)| Replies], S).
 
 handle_request(<<"post">>, #{type := <<"flash">>} = Params, ID) ->
     Led = maps:get(led, Params, 1),
@@ -162,7 +165,8 @@ make_request(Caller, Method, Type, Params, #state{requests = Reqs} = State) ->
 handle_response(Response, #state{requests = Requests} = S) ->
     {Reply, ID} = case Response of
         {result, Result, ID0} -> {{ok, Result}, ID0};
-        {error, _Code, Message, Data, ID0} -> {{error, Message, Data}, ID0}
+        {error, Code, Message, Data, ID0} ->
+            {{error, error_atom(Code), Message, Data}, ID0}
     end,
     case maps:get(ID, Requests) of
         {Caller, Tref} ->
@@ -181,3 +185,9 @@ flash(Led, Color) ->
         grisp_led:off(Led)
     end),
     ok.
+
+error_atom(-1) -> device_not_linked;
+error_atom(-2) -> token_expired;
+error_atom(-3) -> device_already_linked;
+error_atom(-4) -> invalid_token;
+error_atom(_)  -> jsonrpc_error.
