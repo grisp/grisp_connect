@@ -30,8 +30,8 @@ start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 connect() ->
-    {ok, Domain} = application:get_env(seawater_domain),
-    {ok, Port} = application:get_env(seawater_port),
+    {ok, Domain} = application:get_env(grisp_seawater, seawater_domain),
+    {ok, Port} = application:get_env(grisp_seawater, seawater_port),
     connect(Domain, Port).
 
 connect(Server, Port) ->
