@@ -30,7 +30,9 @@ start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 connect() ->
-    connect("seawater.stritzinger.com", 443).
+    {ok, Domain} = application:get_env(seawater_domain),
+    {ok, Port} = application:get_env(seawater_port),
+    connect(Domain, Port).
 
 connect(Server, Port) ->
     gen_server:call(?MODULE, {?FUNCTION_NAME, Server, Port}, 60_000).

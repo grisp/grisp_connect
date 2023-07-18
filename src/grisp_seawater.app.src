@@ -13,7 +13,10 @@
         gun,
         jsx
     ]},
-    {env, []},
+    {env, [
+        {seawater_domain, "grisp.io"},
+        {seawater_port, 7777}
+    ]},
     {modules, []},
     {links, []}
 ]}.

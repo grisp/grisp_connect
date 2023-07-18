@@ -1,9 +1,9 @@
 %--- Erlang Inet Configuration -------------------------------------------------
 
 % Add hosts
-{host, {149,248,205,211}, ["seawater.fly.dev"]}.
-{host, {46,101,169,235},  ["seawater.stritzinger.com"]}.
-{host, {212,18,3,19},     ["0.europe.pool.ntp.org"]}.
+{host, {149,248,205,211}, ["grisp.io"]}.
+{host, {46,101,169,235},  ["seawater.stritzinger.com"]}. % old
+{host, {212,25,1,1},     ["0.europe.pool.ntp.org"]}.
 
 % Do not monitor the hosts file
 {hosts_file, ""}.

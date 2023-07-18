@@ -9,15 +9,12 @@
 %--- Exports -------------------------------------------------------------------
 
 % API functions
--export([open/0, open/2]).
+-export([open/2]).
 -export([close/1]).
 -export([get/2]).
 
 
 %--- API Functions -------------------------------------------------------------
-
-%open() -> open("seawater.fly.dev", 443).
-open() -> open("seawater.stritzinger.com", 443).
 
 open(ServerName, Port) ->
     case ssl_opts(ServerName) of
