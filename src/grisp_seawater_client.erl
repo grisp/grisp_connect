@@ -1,3 +1,4 @@
+%% @doc Websocket client to connect to grisp.io
 -module(grisp_seawater_client).
 
 -export([start_link/0]).

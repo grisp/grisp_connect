@@ -36,7 +36,8 @@ init([]) ->
     },
     ChildSpecs = [
         worker(grisp_seawater_ntp, []),
-        worker(grisp_seawater_client, [])],
+        worker(grisp_seawater_client, []),
+        worker(grisp_io_connection, [])],
     {ok, {SupFlags, ChildSpecs}}.
 
 %% internal functions
