@@ -124,6 +124,7 @@ handle_info({gun_down, Pid, ws, closed, [Stream]},
         erlang:cancel_timer(Tref),
         gen_server:reply(Caller, {error, ws_closed})
      end || {Caller, Tref} <- maps:values(Requests)],
+    grisp_io_connection ! disconnected,
     {noreply, shutdown_gun(S#state{requests = #{}})};
 handle_info(M, S) ->
     ?LOG_WARNING(#{event => unhandled_info, info => M}),

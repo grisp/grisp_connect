@@ -16,8 +16,9 @@
     {env, [
         {seawater_domain, "grisp.io"},
         {seawater_port, 7777},
+        {connect, true}, % keeps a constant connection with grisp.io
         {ntp, false}, % if set to true, starts the NTP client
-        {ws_requests_timeout, 5_000}
+        {ws_requests_timeout, 5_000},
     ]},
     {modules, []},
     {links, []}
