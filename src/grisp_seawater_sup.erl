@@ -40,7 +40,8 @@ init([]) ->
             true -> [worker(grisp_seawater_ntp, [])];
             false -> []
         end ++ 
-        [worker(grisp_seawater_client, [])],
+        [worker(grisp_seawater_client, []),
+         worker(grisp_io_connection, [])],
     {ok, {SupFlags, ChildSpecs}}.
 
 %% internal functions
