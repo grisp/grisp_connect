@@ -15,7 +15,8 @@
     ]},
     {env, [
         {seawater_domain, "grisp.io"},
-        {seawater_port, 7777}
+        {seawater_port, 7777},
+        {ntp, false} % if set to true, starts the NTP client
     ]},
     {modules, []},
     {links, []}

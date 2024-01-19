@@ -34,9 +34,11 @@ init([]) ->
     SupFlags = #{
         strategy => one_for_all
     },
-    ChildSpecs = [
-        worker(grisp_seawater_ntp, []),
-        worker(grisp_seawater_client, [])],
+    NTP = case application:get_env(grisp_seawater, ntp) of
+        {ok, true} -> [worker(grisp_seawater_ntp, [])];
+        {ok, false} -> []
+    end,
+    ChildSpecs = NTP ++ [worker(grisp_seawater_client, [])],
     {ok, {SupFlags, ChildSpecs}}.
 
 %% internal functions
