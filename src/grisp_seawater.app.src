@@ -15,7 +15,17 @@
     ]},
     {env, [
         {seawater_domain, "grisp.io"},
+<<<<<<< HEAD
         {seawater_port, 7777}
+=======
+        {seawater_port, 7777},
+<<<<<<< HEAD
+        {ntp, false} % if set to true, starts the NTP client
+=======
+        {ntp, false}, % starts the NTP client to set the board time
+        {connect, true} % keeps a constant connection with grisp.io
+>>>>>>> 029001b (Make the gen_statem optional and enabled as default)
+>>>>>>> 324f89f (Make the gen_statem optional and enabled as default)
     ]},
     {modules, []},
     {links, []}
