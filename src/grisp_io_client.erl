@@ -3,6 +3,7 @@
 
 % API
 -export([start_link/0]).
+-export([connect/0]).
 
 -behaviour(gen_statem).
 -export([init/1, terminate/3, code_change/4, callback_mode/0, handle_event/4]).
@@ -16,9 +17,18 @@
 start_link() ->
     gen_statem:start_link({local, ?MODULE}, ?MODULE, [], []).
 
+connect() ->
+    gen_statem:cast(?MODULE, connect).
+
 % gen_statem CALLBACKS ---------------------------------------------------------
 
-init([]) -> {ok, waiting_ip, []}.
+init([]) ->
+    {ok, Connect} = application:get_env(grisp_seawater, connect),
+    NextState = case Connect of
+        true -> waiting_ip;
+        false -> idle
+    end,
+    {ok, NextState, []}.
 
 terminate(_Reason, _State, _Data) -> ok.
 
@@ -27,6 +37,12 @@ code_change(_Vsn, State, Data, _Extra) -> {ok, State, Data}.
 callback_mode() -> [handle_event_function, state_enter].
 
 %%% STATE CALLBACKS ------------------------------------------------------------
+
+% IDLE
+handle_event(enter, _OldState, idle, _Data) ->
+    keep_state_and_data;
+handle_event(cast, connect, idle, Data) ->
+    {next_state, waiting_ip, Data};
 
 % WAITING_IP
 handle_event(enter, _OldState, waiting_ip, Data) ->
