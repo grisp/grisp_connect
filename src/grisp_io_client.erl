@@ -1,8 +1,9 @@
 %% @doc State machine to ensure connectivity with grisp.io
--module(grisp_io_connection).
+-module(grisp_io_client).
 
 % API
 -export([start_link/0]).
+
 -behaviour(gen_statem).
 -export([init/1, terminate/3, code_change/4, callback_mode/0, handle_event/4]).
 
@@ -29,37 +30,39 @@ callback_mode() -> [handle_event_function, state_enter].
 
 % WAITING_IP
 handle_event(enter, _OldState, waiting_ip, Data) ->
-    ?LOG_NOTICE("Waiting IP..."),
-    {next_state, waiting_ip, Data, [{state_timeout, ?STD_TIMEOUT, retry}]};
+    {next_state, waiting_ip, Data, [{state_timeout, 0, retry}]};
 handle_event(state_timeout, retry, waiting_ip, Data) ->
     case check_inet_ipv4() of
-        true ->
+        {ok, IP} ->
+            ?LOG_INFO("Detected IP: ~p", [IP]),
             {next_state, connecting, Data};
-        false ->
+        invalid ->
+            ?LOG_INFO("Waiting IP..."),
             {next_state, waiting_ip, Data, [{state_timeout, ?STD_TIMEOUT, retry}]}
     end;
 
 % CONNECTING
-handle_event(enter, _OldState, connecting, Data) ->
-    {next_state, connecting, Data, [{state_timeout, ?STD_TIMEOUT, retry}]};
-handle_event(state_timeout, retry, connecting, Data) ->
+handle_event(enter, _OldState, connecting, _Data) ->
     {ok, Domain} = application:get_env(grisp_seawater, seawater_domain),
     {ok, Port} = application:get_env(grisp_seawater, seawater_port),
     ?LOG_NOTICE("Connecting to ~p:~p",[Domain, Port]),
-    case grisp_seawater_client:connect() of
-        ok ->
+    grisp_seawater_ws:connect(),
+    {keep_state_and_data, [{state_timeout, ?STD_TIMEOUT, retry}]};
+handle_event(state_timeout, retry, connecting, Data) ->
+    case grisp_seawater_ws:is_connected() of
+        true ->
             ?LOG_NOTICE("Connection enstablished!"),
             {next_state, pinging, Data};
-        {error, E} ->
-            ?LOG_ERROR("Failed to connect to seawater: ~p",[E]),
-            {next_state, connecting, Data, [{state_timeout, ?STD_TIMEOUT, retry}]}
+        false ->
+            ?LOG_NOTICE("Waiting connection ..."),
+            {keep_state_and_data, [{state_timeout, ?STD_TIMEOUT, retry}]}
     end;
 
 % PINGING
 handle_event(enter, _OldState, pinging, Data) ->
     {next_state, pinging, Data, [{state_timeout, ?STD_TIMEOUT, retry}]};
 handle_event(state_timeout, retry, pinging, Data) ->
-    case grisp_seawater_client:ping() of
+    case grisp_seawater_ws:ping() of
         {ok, <<"pong">>} ->
             {next_state, connected, Data};
         {ok, <<"pang">>} ->
@@ -70,10 +73,13 @@ handle_event(state_timeout, retry, pinging, Data) ->
     end;
 
 % CONNECTED
-handle_event(enter, _OldState, connected, Data) ->
-    {keep_state, Data};
+handle_event(enter, _OldState, connected, _Data) ->
+    keep_state_and_data;
+handle_event(info, disconnected, connected, Data) ->
+    ?LOG_WARNING("Disconnected!"),
+    {next_state, waiting_ip, Data};
 
-handle_event( E, OldS, NewS, Data) ->
+handle_event(E, OldS, NewS, Data) ->
     ?LOG_ERROR("Unhandled Event = ~p, OldS = ~p, NewS = ~p",[E, OldS, NewS]),
     {keep_state, Data}.
 
@@ -81,8 +87,8 @@ handle_event( E, OldS, NewS, Data) ->
 
 check_inet_ipv4() ->
     case get_ip_of_valid_interfaces() of
-        {_,_,_,_} = IP when IP =/= {127,0,0,1} -> true;
-        _ -> false
+        {_,_,_,_} = IP when IP =/= {127,0,0,1} -> {ok, IP};
+        _ -> invalid
     end.
 
 get_ipv4_from_opts([]) ->

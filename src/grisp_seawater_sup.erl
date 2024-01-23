@@ -34,14 +34,20 @@ init([]) ->
     SupFlags = #{
         strategy => one_for_all
     },
-    {ok, NTP} = application:get_env(grisp_seawater, ntp),
-    ChildSpecs =
-        case NTP of
-            true -> [worker(grisp_seawater_ntp, [])];
-            false -> []
-        end ++ 
-        [worker(grisp_seawater_client, []),
-         worker(grisp_io_connection, [])],
+    {ok, Ntp} = application:get_env(grisp_seawater, ntp),
+    {ok, Connect} = application:get_env(grisp_seawater, connect),
+    NtpCient = case Ntp of
+        true -> [worker(grisp_seawater_ntp, [])];
+        false -> []
+    end,
+    GrispIOStateMachine =  case Connect of
+        true -> [worker(grisp_io_client, [])];
+        false -> []
+    end,
+    ChildSpecs = 
+        NtpCient ++ 
+        [worker(grisp_seawater_ws, [])] ++
+        GrispIOStateMachine,
     {ok, {SupFlags, ChildSpecs}}.
 
 %% internal functions

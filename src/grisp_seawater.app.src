@@ -16,7 +16,8 @@
     {env, [
         {seawater_domain, "grisp.io"},
         {seawater_port, 7777},
-        {ntp, false} % starts the NTP client
+        {ntp, false}, % starts the NTP client to set the board time
+        {connect, true} % keeps a constant connection with grisp.io
     ]},
     {modules, []},
     {links, []}
