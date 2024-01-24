@@ -1,4 +1,4 @@
-name: Grisp Seawater CT
+name: grisp_io CT
 
 on:
   push:

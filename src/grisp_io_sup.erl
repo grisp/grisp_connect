@@ -1,9 +1,9 @@
 %%%-------------------------------------------------------------------
-%% @doc grisp_seawater top level supervisor.
+%% @doc grisp_io top level supervisor.
 %% @end
 %%%-------------------------------------------------------------------
 
--module(grisp_seawater_sup).
+-module(grisp_io_sup).
 
 -behaviour(supervisor).
 
@@ -34,14 +34,14 @@ init([]) ->
     SupFlags = #{
         strategy => one_for_all
     },
-    {ok, Ntp} = application:get_env(grisp_seawater, ntp),
+    {ok, Ntp} = application:get_env(grisp_io, ntp),
     NtpCient = case Ntp of
-        true -> [worker(grisp_seawater_ntp, [])];
+        true -> [worker(grisp_io_ntp, [])];
         false -> []
     end,
     ChildSpecs = 
         NtpCient ++ 
-        [worker(grisp_seawater_ws, []),
+        [worker(grisp_io_ws, []),
          worker(grisp_io_client, [])],
     {ok, {SupFlags, ChildSpecs}}.
 

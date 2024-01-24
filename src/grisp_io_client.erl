@@ -1,4 +1,4 @@
-%% @doc State machine to ensure connectivity with grisp.io
+%% @doc State machine to ensure connectivity with GRiSP.io
 -module(grisp_io_client).
 
 % API
@@ -23,7 +23,7 @@ connect() ->
 % gen_statem CALLBACKS ---------------------------------------------------------
 
 init([]) ->
-    {ok, Connect} = application:get_env(grisp_seawater, connect),
+    {ok, Connect} = application:get_env(grisp_io, connect),
     NextState = case Connect of
         true -> waiting_ip;
         false -> idle
@@ -59,13 +59,13 @@ handle_event(state_timeout, retry, waiting_ip, Data) ->
 
 % CONNECTING
 handle_event(enter, _OldState, connecting, _Data) ->
-    {ok, Domain} = application:get_env(grisp_seawater, seawater_domain),
-    {ok, Port} = application:get_env(grisp_seawater, seawater_port),
+    {ok, Domain} = application:get_env(grisp_io, grisp_io_domain),
+    {ok, Port} = application:get_env(grisp_io, grisp_io_port),
     ?LOG_NOTICE("Connecting to ~p:~p",[Domain, Port]),
-    grisp_seawater_ws:connect(),
+    grisp_io_ws:connect(),
     {keep_state_and_data, [{state_timeout, ?STD_TIMEOUT, retry}]};
 handle_event(state_timeout, retry, connecting, Data) ->
-    case grisp_seawater_ws:is_connected() of
+    case grisp_io_ws:is_connected() of
         true ->
             ?LOG_NOTICE("Connection enstablished!"),
             {next_state, pinging, Data};
@@ -78,7 +78,7 @@ handle_event(state_timeout, retry, connecting, Data) ->
 handle_event(enter, _OldState, pinging, Data) ->
     {next_state, pinging, Data, [{state_timeout, ?STD_TIMEOUT, retry}]};
 handle_event(state_timeout, retry, pinging, Data) ->
-    case grisp_seawater_ws:ping() of
+    case grisp_io_ws:ping() of
         {ok, <<"pong">>} ->
             {next_state, connected, Data};
         {ok, <<"pang">>} ->

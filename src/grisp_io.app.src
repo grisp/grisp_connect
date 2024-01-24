@@ -1,8 +1,8 @@
-{application, grisp_seawater, [
-    {description, "Grisp2 Seawater Client Library"},
+{application, grisp_io, [
+    {description, "GRiSP.io Client Library"},
     {vsn, "0.1.0"},
     {registered, []},
-    {mod, {grisp_seawater_app, []}},
+    {mod, {grisp_io_app, []}},
     {applications, [
         kernel,
         inets,
@@ -14,8 +14,8 @@
         jsx
     ]},
     {env, [
-        {seawater_domain, "grisp.io"},
-        {seawater_port, 7777},
+        {grisp_io_domain, "grisp.io"},
+        {grisp_io_port, 7777},
         {ntp, false}, % starts the NTP client to set the board time
         {connect, true} % keeps a constant connection with grisp.io
     ]},
