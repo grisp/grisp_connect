@@ -1,16 +1,25 @@
 %% @doc State machine to ensure connectivity with GRiSP.io
 -module(grisp_io_client).
 
-% API
+% External API
 -export([start_link/0]).
 -export([connect/0]).
+-export([request/3]).
+
+% Internal API
+-export([handle_message/1]).
 
 -behaviour(gen_statem).
 -export([init/1, terminate/3, code_change/4, callback_mode/0, handle_event/4]).
 
 -include_lib("kernel/include/logger.hrl").
 
--define(STD_TIMEOUT, 1000).
+-define(state_timeout, 1000).
+-define(request_timeout, 5_000).
+
+% Records
+
+-record(data, {requests = #{}}).
 
 % API
 
@@ -18,7 +27,16 @@ start_link() ->
     gen_statem:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 connect() ->
-    gen_statem:cast(?MODULE, connect).
+    gen_statem:cast(?MODULE, ?FUNCTION_NAME).
+
+request(Method, Type, Params) ->
+    gen_statem:call(?MODULE, {?FUNCTION_NAME, Method, Type, Params}).
+
+
+% TODO: make this function a cast to not block the WS gen_server
+handle_message(Payload) ->
+    gen_statem:call(?MODULE, {?FUNCTION_NAME, Payload}).
+
 
 % gen_statem CALLBACKS ---------------------------------------------------------
 
@@ -28,7 +46,7 @@ init([]) ->
         true -> waiting_ip;
         false -> idle
     end,
-    {ok, NextState, []}.
+    {ok, NextState, #data{}}.
 
 terminate(_Reason, _State, _Data) -> ok.
 
@@ -37,6 +55,54 @@ code_change(_Vsn, State, Data, _Extra) -> {ok, State, Data}.
 callback_mode() -> [handle_event_function, state_enter].
 
 %%% STATE CALLBACKS ------------------------------------------------------------
+
+handle_event({call, From}, {request, Method, Type, Params}, connected,
+            #data{requests = Requests} = Data) ->
+    {ID, Payload} = grisp_io_jsonrpc_api:request(Method, Type, Params),
+    grisp_io_ws:send(Payload),
+    NewRequests = Requests#{ID => From},
+    {keep_state,
+     Data#data{requests = NewRequests},
+     [{{timeout, ID}, ?request_timeout, request}]};
+handle_event({call, WebSocket}, {handle_message, Payload}, connected,
+            #data{requests = Requests} = Data) ->
+    Replyes = grisp_io_jsonrpc_api:handle_msg(Payload),
+    % TODO: support jsonrpc batch communications,
+    % needs handling of multiple gen_statem reply actions
+    {NewData, Actions} = case Replyes of
+        [] ->
+            {Data, [{reply, WebSocket, noreply}]};
+        [{request, Response}] ->
+            {Data, [{reply, WebSocket, Response}]};
+        [{response, ID, Response}] ->
+            case maps:take(ID, Requests) of
+                {Caller, NewRequests} ->
+                    Acts = [
+                        {{timeout, ID}, cancel},
+                        {reply, Caller, Response},
+                        {reply, WebSocket, noreply}],
+                    {Data#data{requests = NewRequests}, Acts};
+                error ->
+                    ?LOG_WARNING("Unexpected jsonrpc response: ~p", [ID]),
+                    {Data, [{reply, WebSocket, noreply}]}
+            end
+    end,
+    {keep_state, NewData, Actions};
+handle_event({timeout, ID}, request, connected,
+            #data{requests = Requests} = Data) ->
+    Caller = maps:get(ID, Requests),
+    {keep_state,
+        Data#data{requests = maps:remove(ID, Requests)},
+        [{reply, Caller, {error, timeout}}]};
+handle_event({call, From}, _, State, Data) ->
+    {keep_state, Data, [{reply, From, {bad_client_state, State}}]};
+
+
+handle_event(cast, Cast, State, _Data) ->
+    ?LOG_WARNING("Unhandled cast in state ~p: ~p",[State, Cast]),
+    keep_state_and_data;
+
+%--- State Machine -------------------------------------------------------------
 
 % IDLE
 handle_event(enter, _OldState, idle, _Data) ->
@@ -54,7 +120,7 @@ handle_event(state_timeout, retry, waiting_ip, Data) ->
             {next_state, connecting, Data};
         invalid ->
             ?LOG_INFO("Waiting IP..."),
-            {next_state, waiting_ip, Data, [{state_timeout, ?STD_TIMEOUT, retry}]}
+            {next_state, waiting_ip, Data, [{state_timeout, ?state_timeout, retry}]}
     end;
 
 % CONNECTING
@@ -63,29 +129,15 @@ handle_event(enter, _OldState, connecting, _Data) ->
     {ok, Port} = application:get_env(grisp_io, grisp_io_port),
     ?LOG_NOTICE("Connecting to ~p:~p",[Domain, Port]),
     grisp_io_ws:connect(),
-    {keep_state_and_data, [{state_timeout, ?STD_TIMEOUT, retry}]};
+    {keep_state_and_data, [{state_timeout, ?state_timeout, retry}]};
 handle_event(state_timeout, retry, connecting, Data) ->
     case grisp_io_ws:is_connected() of
         true ->
             ?LOG_NOTICE("Connection enstablished!"),
-            {next_state, pinging, Data};
+            {next_state, connected, Data};
         false ->
             ?LOG_NOTICE("Waiting connection ..."),
-            {keep_state_and_data, [{state_timeout, ?STD_TIMEOUT, retry}]}
-    end;
-
-% PINGING
-handle_event(enter, _OldState, pinging, Data) ->
-    {next_state, pinging, Data, [{state_timeout, ?STD_TIMEOUT, retry}]};
-handle_event(state_timeout, retry, pinging, Data) ->
-    case grisp_io_ws:ping() of
-        {ok, <<"pong">>} ->
-            {next_state, connected, Data};
-        {ok, <<"pang">>} ->
-            ?LOG_WARNING("Device not linked!"),
-            {next_state, connected, Data};
-        {error, disconnected} ->
-            {next_state, connecting, Data}
+            {keep_state_and_data, [{state_timeout, ?state_timeout, retry}]}
     end;
 
 % CONNECTED
