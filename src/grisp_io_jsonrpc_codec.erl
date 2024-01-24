@@ -1,3 +1,4 @@
+% @doc Jsonrpc codec library to pack and unpack json binaries
 -module(grisp_io_jsonrpc_codec).
 
 % API
@@ -5,7 +6,7 @@
 -export([encode/1]).
 -export([format_error/1]).
 
-%--- Types ---------------------------------------------------------------------
+%--- Macro ---------------------------------------------------------------------
 
 -define(V, jsonrpc => <<"2.0">>).
 -define(is_valid(Message),
@@ -18,7 +19,7 @@
     (is_map(Params) orelse is_list(Params))
 ).
 
-%--- API ----------------------------------------------------------------------
+%--- API -----------------------------------------------------------------------
 
 decode(Term) ->
     case json_to_term(Term) of
