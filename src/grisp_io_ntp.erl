@@ -1,11 +1,15 @@
 -module(grisp_io_ntp).
 
+%--- Exports -------------------------------------------------------------------
+
 % API
 -export([start_link/0]).
 -export([get_time/0, get_time/1]).
 
 -behaviour(gen_statem).
 -export([init/1, terminate/3, code_change/4, callback_mode/0, handle_event/4]).
+
+%--- Macro ---------------------------------------------------------------------
 
 -define(NTP_PORT,       123).                   % udp
 -define(SERVER_TIMEOUT, 5000).                  % ms
@@ -14,9 +18,7 @@
 
 -include_lib("kernel/include/logger.hrl").
 
-
-
-% API
+%--- API -----------------------------------------------------------------------
 
 start_link() ->
     gen_statem:start_link({local, ?MODULE}, ?MODULE, [], []).

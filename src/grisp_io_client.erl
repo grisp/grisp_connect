@@ -1,5 +1,8 @@
 %% @doc State machine to ensure connectivity with GRiSP.io
+%% and manage API traffic over the Websocket client
 -module(grisp_io_client).
+
+%--- Exports -------------------------------------------------------------------
 
 % External API
 -export([start_link/0]).
@@ -14,14 +17,16 @@
 
 -include_lib("kernel/include/logger.hrl").
 
+%--- Macro ---------------------------------------------------------------------
+
 -define(state_timeout, 1000).
 -define(request_timeout, 5_000).
 
-% Records
+%--- Records -------------------------------------------------------------------
 
 -record(data, {requests = #{}}).
 
-% API
+%--- API -----------------------------------------------------------------------
 
 start_link() ->
     gen_statem:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -31,7 +36,6 @@ connect() ->
 
 request(Method, Type, Params) ->
     gen_statem:call(?MODULE, {?FUNCTION_NAME, Method, Type, Params}).
-
 
 % TODO: make this function a cast to not block the WS gen_server
 handle_message(Payload) ->
@@ -97,11 +101,6 @@ handle_event({timeout, ID}, request, connected,
 handle_event({call, From}, _, State, Data) ->
     {keep_state, Data, [{reply, From, {bad_client_state, State}}]};
 
-
-handle_event(cast, Cast, State, _Data) ->
-    ?LOG_WARNING("Unhandled cast in state ~p: ~p",[State, Cast]),
-    keep_state_and_data;
-
 %--- State Machine -------------------------------------------------------------
 
 % IDLE
@@ -120,7 +119,8 @@ handle_event(state_timeout, retry, waiting_ip, Data) ->
             {next_state, connecting, Data};
         invalid ->
             ?LOG_INFO("Waiting IP..."),
-            {next_state, waiting_ip, Data, [{state_timeout, ?state_timeout, retry}]}
+            {next_state, waiting_ip, Data,
+                [{state_timeout, ?state_timeout, retry}]}
     end;
 
 % CONNECTING

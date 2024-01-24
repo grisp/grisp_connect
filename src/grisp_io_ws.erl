@@ -1,6 +1,8 @@
 %% @doc GRiSP.io Websocket Client
 -module(grisp_io_ws).
 
+%--- Exports -------------------------------------------------------------------
+
 -export([start_link/0]).
 -export([connect/0]).
 -export([connect/2]).
@@ -13,6 +15,8 @@
 -export([handle_call/3]).
 -export([handle_cast/2]).
 -export([handle_info/2]).
+
+%--- Records -------------------------------------------------------------------
 
 -record(state, {
     gun_pid,
@@ -78,7 +82,7 @@ handle_info({gun_upgrade, Pid, Stream, [<<"websocket">>], _},
             #state{gun_pid = Pid, ws_stream = Stream} = S) ->
     ?LOG_INFO("WS Upgraded"),
     {noreply, S#state{ws_up = true}};
-handle_info({gun_response, Pid, Stream, _, Status, Headers},
+handle_info({gun_response, Pid, Stream, _, Status, _Headers},
             #state{gun_pid = Pid, ws_stream = Stream} = S) ->
     ?LOG_ERROR("WS Upgrade fail with status ~p", [Status]),
     grisp_io_client ! {connection_fail, upgrade},
@@ -112,7 +116,7 @@ handle_info(M, S) ->
     ?LOG_WARNING("Unandled WS message: ~p", [M]),
     {noreply, S}.
 
-% internal functions -----------------------------
+% internal functions -----------------------------------------------------------
 
 shutdown_gun(#state{gun_pid = Pid} = State) ->
     gun:shutdown(Pid),
