@@ -1,7 +1,7 @@
-grisp_seawater
+grisp_io
 ==================
 
-Grisp2 Seawater Client Library
+Grisp2 Client Application for GRiSP.io
 
 
 Build
@@ -9,10 +9,5 @@ Build
 
     $ rebar3 compile
 
-
-Basic Low Level API Usage
+Options
 -------------------------
-
-    {ok, Conn} = grisp_seawater_http:open().
-    {ok, Status, Body} = grisp_seawater_http:get(Conn, "/grisp-connect").
-    grisp_seawater_http:close(Conn).

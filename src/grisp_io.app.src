@@ -1,0 +1,23 @@
+{application, grisp_io, [
+    {description, "GRiSP.io Client Library"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {grisp_io_app, []}},
+    {applications, [
+        kernel,
+        inets,
+        stdlib,
+        grisp,
+        grisp_cryptoauth,
+        certifi,
+        gun,
+        jsx
+    ]},
+    {env, [
+        {grisp_io_domain, "grisp.io"},
+        {grisp_io_port, 7777},
+        {connect, true} % keeps a constant connection with grisp.io
+    ]},
+    {modules, []},
+    {links, []}
+]}.

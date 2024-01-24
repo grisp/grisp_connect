@@ -1,9 +1,9 @@
 %%%-------------------------------------------------------------------
-%% @doc Grisp Seawater Low Level HTTPS Setup.
+%% @doc GRiSP.io HTTPS Setup.
 %% @end
 %%%-------------------------------------------------------------------
 
--module(grisp_seawater_tls).
+-module(grisp_io_tls).
 
 
 %--- Exports -------------------------------------------------------------------
@@ -73,7 +73,7 @@ load_cert_chain(RelPath) ->
     end.
 
 cert_path(RelPath) ->
-    PrivDir = code:priv_dir(grisp_seawater),
+    PrivDir = code:priv_dir(grisp_io),
     filename:join([PrivDir | RelPath]) ++ ".pem".
 
 decode_cert_chain(PemData) ->

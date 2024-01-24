@@ -1,9 +1,9 @@
 %%%-------------------------------------------------------------------
-%% @doc grisp_seawater top level supervisor.
+%% @doc grisp_io top level supervisor.
 %% @end
 %%%-------------------------------------------------------------------
 
--module(grisp_seawater_sup).
+-module(grisp_io_sup).
 
 -behaviour(supervisor).
 
@@ -35,8 +35,8 @@ init([]) ->
         strategy => one_for_all
     },
     ChildSpecs = [
-        worker(grisp_seawater_ntp, []),
-        worker(grisp_seawater_ws, []),
+        worker(grisp_io_ntp, []),
+        worker(grisp_io_ws, []),
         worker(grisp_io_client, [])],
     {ok, {SupFlags, ChildSpecs}}.
 
