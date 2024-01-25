@@ -1,9 +1,12 @@
 %% @doc State machine to ensure connectivity with grisp.io
 -module(grisp_io_connection).
 
-% API
+% External API
 -export([start_link/0]).
 -export([connect/0]).
+
+% Internal API
+-export([disconnected/0]).
 
 -behaviour(gen_statem).
 -export([init/1, terminate/3, code_change/4, callback_mode/0, handle_event/4]).
@@ -19,6 +22,9 @@ start_link() ->
 
 connect() ->
     gen_statem:cast(?MODULE, ?FUNCTION_NAME).
+
+disconnected() ->
+    gen_statem:castl(?MODULE, ?FUNCTION_NAME).
 
 % gen_statem CALLBACKS ---------------------------------------------------------
 
@@ -66,7 +72,7 @@ handle_event(enter, _OldState, connecting, _Data) ->
 handle_event(state_timeout, retry, connecting, Data) ->
     case grisp_seawater_client:connect() of
         ok ->
-            ?LOG_NOTICE("Connection enstablished!"),
+            ?LOG_NOTICE(#{event => connected}),
             {next_state, connected, Data};
         Error ->
             ?LOG_ERROR("Connection failed with error ~p, Retryng ...",[Error]),
@@ -76,8 +82,8 @@ handle_event(state_timeout, retry, connecting, Data) ->
 % CONNECTED
 handle_event(enter, _OldState, connected, _Data) ->
     keep_state_and_data;
-handle_event(info, disconnected, connected, Data) ->
-    ?LOG_WARNING("Disconnected!"),
+handle_event(cast, disconnected, connected, Data) ->
+    ?LOG_WARNING(#{event => disconnected}),
     {next_state, waiting_ip, Data};
 
 handle_event(E, OldS, NewS, Data) ->
