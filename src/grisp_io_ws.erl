@@ -49,7 +49,7 @@ request(Method, Type, Params) ->
                     {?FUNCTION_NAME, Method, Type, Params},
                     ?call_timeout).
 
-% gen_server callbacks ---------------------------------------------------------
+% gen_server callbacks -----------------------------
 
 init([]) -> {ok, #state{}}.
 
@@ -75,7 +75,9 @@ handle_cast({connect, Server, Port}, #state{gun_pid = undefined} = S) ->
             {noreply, S}
     end;
 handle_cast({connect, _Server, _Port}, S) ->
-    {noreply, S}.
+    {noreply, S};
+handle_cast(_Msg, _S) ->
+    error(unhandled_cast).
 
 handle_info({gun_up, GunPid, _}, #state{gun_pid = GunPid} = S) ->
     ?LOG_INFO(#{event => connection_enstablished}),

@@ -40,7 +40,8 @@ init([]) ->
     end,
     ChildSpecs = NTP ++ [
         worker(grisp_io_ws, []),
-        worker(grisp_io_connection, [])
+        worker(grisp_io_connection, []),
+        worker(grisp_io_logtest, [])
     ],
     {ok, {SupFlags, ChildSpecs}}.
 
