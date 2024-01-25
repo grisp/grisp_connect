@@ -17,5 +17,4 @@ _build
 *.iml
 rebar3.crashdump
 *~
-rebar.lock
 .DS_Store
