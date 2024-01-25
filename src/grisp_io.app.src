@@ -21,7 +21,15 @@
         {port, 7777},
         {connect, true}, % keeps a constant connection with grisp.io
         {ntp, false}, % if set to true, starts the NTP client
-        {ws_requests_timeout, 5_000}
+        {ws_requests_timeout, 5_000},
+        {logger, [
+          % Enable our own default handler,
+          % which will receive all events from boot
+          {handler,
+           grisp_io,
+           grisp_io_logger_bin,
+           #{formatter => {grisp_io_logger_bin, #{}}}}
+        ]}
     ]},
     {modules, []},
     {links, []}
