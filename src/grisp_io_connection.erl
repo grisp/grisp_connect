@@ -68,15 +68,15 @@ handle_event(enter, _OldState, connecting, _Data) ->
     {ok, Domain} = application:get_env(grisp_seawater, seawater_domain),
     {ok, Port} = application:get_env(grisp_seawater, seawater_port),
     ?LOG_NOTICE(#{event => connecting, domain => Domain, port => Port}),
+    grisp_seawater_ws:connect(Domain, Port),
     {keep_state_and_data, [{state_timeout, 0, retry}]};
 handle_event(state_timeout, retry, connecting, Data) ->
-    case grisp_seawater_client:connect() of
-        ok ->
+    case grisp_seawater_ws:is_connected() of
+        true ->
             ?LOG_NOTICE(#{event => connected}),
             {next_state, connected, Data};
-        Error ->
-            ?LOG_ERROR(#{event => connection_failed,
-                         reason => Error}),
+        false ->
+            ?LOG_NOTICE(#{event => waiting_ws_connection}),
             {keep_state_and_data, [{state_timeout, ?STD_TIMEOUT, retry}]}
     end;
 
