@@ -56,10 +56,10 @@ handle_event(enter, _OldState, waiting_ip, Data) ->
 handle_event(state_timeout, retry, waiting_ip, Data) ->
     case check_inet_ipv4() of
         {ok, IP} ->
-            ?LOG_INFO("Detected IP: ~p", [IP]),
+            ?LOG_INFO(#{event => checked_ip, ip => IP}),
             {next_state, connecting, Data};
         invalid ->
-            ?LOG_INFO("Waiting IP..."),
+            ?LOG_INFO(#{event => waiting_ip}),
             {next_state, waiting_ip, Data, [{state_timeout, ?STD_TIMEOUT, retry}]}
     end;
 
@@ -67,7 +67,7 @@ handle_event(state_timeout, retry, waiting_ip, Data) ->
 handle_event(enter, _OldState, connecting, _Data) ->
     {ok, Domain} = application:get_env(grisp_seawater, seawater_domain),
     {ok, Port} = application:get_env(grisp_seawater, seawater_port),
-    ?LOG_NOTICE("Connecting to ~p:~p",[Domain, Port]),
+    ?LOG_NOTICE(#{event => connecting, domain => Domain, port => Port}),
     {keep_state_and_data, [{state_timeout, 0, retry}]};
 handle_event(state_timeout, retry, connecting, Data) ->
     case grisp_seawater_client:connect() of
@@ -75,7 +75,8 @@ handle_event(state_timeout, retry, connecting, Data) ->
             ?LOG_NOTICE(#{event => connected}),
             {next_state, connected, Data};
         Error ->
-            ?LOG_ERROR("Connection failed with error ~p, Retryng ...",[Error]),
+            ?LOG_ERROR(#{event => connection_failed,
+                         reason => Error}),
             {keep_state_and_data, [{state_timeout, ?STD_TIMEOUT, retry}]}
     end;
 
@@ -87,7 +88,10 @@ handle_event(cast, disconnected, connected, Data) ->
     {next_state, waiting_ip, Data};
 
 handle_event(E, OldS, NewS, Data) ->
-    ?LOG_ERROR("Unhandled Event = ~p, OldS = ~p, NewS = ~p",[E, OldS, NewS]),
+    ?LOG_ERROR(#{event => unhandled_gen_statem_event,
+                 gen_statem_event => E,
+                 old_state => OldS,
+                 new_state => NewS}),
     {keep_state, Data}.
 
 % INTERNALS --------------------------------------------------------------------
