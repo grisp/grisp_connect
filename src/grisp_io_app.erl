@@ -1,9 +1,9 @@
 %%%-------------------------------------------------------------------
-%% @doc grisp_seawater public API
+%% @doc grisp_io public API
 %% @end
 %%%-------------------------------------------------------------------
 
--module(grisp_seawater_app).
+-module(grisp_io_app).
 
 -behaviour(application).
 
@@ -17,7 +17,7 @@
 %--- Behaviour application Callback Functions ----------------------------------
 
 start(_StartType, _StartArgs) ->
-    grisp_seawater_sup:start_link().
+    grisp_io_sup:start_link().
 
 stop(_State) ->
     ok.

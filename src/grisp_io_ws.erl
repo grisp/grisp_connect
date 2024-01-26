@@ -1,5 +1,5 @@
 %% @doc Websocket client to connect to grisp.io
--module(grisp_seawater_ws).
+-module(grisp_io_ws).
 
 -export([start_link/0]).
 -export([connect/0]).
@@ -36,8 +36,8 @@ start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 connect() ->
-    {ok, Domain} = application:get_env(grisp_seawater, seawater_domain),
-    {ok, Port} = application:get_env(grisp_seawater, seawater_port),
+    {ok, Domain} = application:get_env(grisp_io, domain),
+    {ok, Port} = application:get_env(grisp_io, port),
     connect(Domain, Port).
 
 connect(Server, Port) ->
@@ -47,7 +47,7 @@ is_connected() ->
     gen_server:call(?MODULE, ?FUNCTION_NAME).
 
 link_device() ->
-    case application:get_env(grisp_seawater, device_linking_token) of
+    case application:get_env(grisp_io, device_linking_token) of
         undefined -> {error, token_undefined};
         {ok, Token} -> link_device(Token)
     end.
@@ -75,7 +75,7 @@ handle_call({link_device, Token}, From, S) ->
     {noreply, NewS}.
 
 handle_cast({connect, Server, Port}, #state{gun_pid = undefined} = S) ->
-    case grisp_seawater_tls:connect(Server, Port) of
+    case grisp_io_tls:connect(Server, Port) of
         {ok, GunPid} ->
             {noreply, #state{gun_pid = GunPid}};
         Error ->
@@ -101,11 +101,11 @@ handle_info({gun_response, Pid, Stream, _, Status, _Headers},
     {noreply, shutdown_gun(S)};
 handle_info({gun_ws, Conn, Stream, {text, JSON}},
             #state{gun_pid = Conn, ws_stream = Stream}= S) ->
-    JSON_RPC = grisp_seawater_jsonrpc:decode(JSON),
+    JSON_RPC = grisp_io_jsonrpc:decode(JSON),
     case handle_jsonrpc(JSON_RPC, S) of
         {[], NewS} -> {noreply, NewS};
         {Msgs, NewS} ->
-            Text = grisp_seawater_jsonrpc:encode(Msgs),
+            Text = grisp_io_jsonrpc:encode(Msgs),
             gun:ws_send(S#state.gun_pid, S#state.ws_stream, {text, Text}),
             {noreply, NewS}
     end;
@@ -150,19 +150,19 @@ handle_rpc_messages([{error, _Code, _Msg, _Data, _ID} = E | Batch],
 handle_rpc_messages([{internal_error, _, _} = E | Batch], Replies, S) ->
     ?LOG_ERROR(#{event => internal_jsonrpc_error, message => E}),
     handle_rpc_messages(Batch,
-                        [grisp_seawater_jsonrpc:format_error(E)| Replies], S).
+                        [grisp_io_jsonrpc:format_error(E)| Replies], S).
 
 handle_request(<<"post">>, #{type := <<"flash">>} = Params, ID) ->
     Led = maps:get(led, Params, 1),
     Color = maps:get(color, Params, red),
     {result, flash(Led, Color), ID};
 handle_request(_, _, ID) ->
-    grisp_seawater_jsonrpc:format_error({internal_error, method_not_found, ID}).
+    grisp_io_jsonrpc:format_error({internal_error, method_not_found, ID}).
 
 make_request(Caller, Method, Type, Params, #state{requests = Reqs} = State) ->
     ID = id(),
     Rpc = {request, Method, maps:put(type, Type, Params), ID},
-    Msg = grisp_seawater_jsonrpc:encode(Rpc),
+    Msg = grisp_io_jsonrpc:encode(Rpc),
     gun:ws_send(State#state.gun_pid, State#state.ws_stream, {text, Msg}),
     TRef = erlang:start_timer(ws_request_timeout(), self(), ID),
     Request = {Caller, TRef},
@@ -206,5 +206,5 @@ shutdown_gun(#state{gun_pid = Pid} = State) ->
     State?disconnected_state.
 
 ws_request_timeout() ->
-    {ok, Timeout} = application:get_env(grisp_seawater, seawater_domain),
+    {ok, Timeout} = application:get_env(grisp_io, io_domain),
     Timeout.
