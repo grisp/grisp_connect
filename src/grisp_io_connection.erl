@@ -94,7 +94,7 @@ handle_event(E, OldS, NewS, Data) ->
 
 check_inet_ipv4() ->
     case get_ip_of_valid_interfaces() of
-        {_,_,_,_} = IP when IP =/= {127,0,0,1} -> {ok, IP};
+        {IP1,_,_,_} = IP when IP1 =/= 127 -> {ok, IP};
         _ -> invalid
     end.
 
