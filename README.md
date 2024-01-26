@@ -4,6 +4,11 @@ Grisp2 Seawater Client Library
 
 ## Application env options
 
+### connect
+
+This option is set to `true` as default. Set it to `false` to prevent automatic connection to GRiSP.io on boot.
+In such case the state machine that maintains the connection can be started manually using `grisp_io_connection:connect()`.
+
 ### ntp
 
 An optional NTP client can be started using option `{ntp, true}`.
