@@ -1,22 +1,20 @@
 %%%-------------------------------------------------------------------
-%% @doc Grisp Seawater Low Level HTTP API.
+%% @doc Grisp Seawater Low Level HTTPS Setup.
 %% @end
 %%%-------------------------------------------------------------------
 
--module(grisp_seawater_http).
+-module(grisp_seawater_tls).
 
 
 %--- Exports -------------------------------------------------------------------
 
 % API functions
--export([open/2]).
--export([close/1]).
--export([get/2]).
+-export([connect/2]).
 
 
 %--- API Functions -------------------------------------------------------------
 
-open(ServerName, Port) ->
+connect(ServerName, Port) ->
     case ssl_opts(ServerName) of
         {error, _Reason} = Error -> Error;
         {ok, TransOpts} ->
@@ -24,35 +22,8 @@ open(ServerName, Port) ->
                     protocols => [http],
                     transport => tls,
                     tls_opts => TransOpts},
-            case gun:open(ServerName, Port, GunOpts) of
-                {error, _Reason} = Error -> Error;
-                {ok, Conn} ->
-                    erlang:link(Conn),
-                    case gun:await_up(Conn) of
-                        {error, _Reason} = Error -> Error;
-                        {ok, _} -> {ok, Conn}
-                    end
-            end
+            gun:open(ServerName, Port, GunOpts)
     end.
-
-close(Conn) ->
-    erlang:unlink(Conn),
-    gun:shutdown(Conn),
-    ok.
-
-get(Conn, Path) ->
-    StreamRef = gun:get(Conn, Path),
-    case gun:await(Conn, StreamRef) of
-        {error, _Reason} = Error -> Error;
-        {response, fin, Status, _Headers} ->
-            {ok, Status, undefined};
-        {response, nofin, Status, _Headers} ->
-            case gun:await_body(Conn, StreamRef) of
-                {error, _Reason} = Error -> Error;
-                {ok, Body} -> {ok, Status, Body}
-            end
-    end.
-
 
 %--- Internal Functions --------------------------------------------------------
 

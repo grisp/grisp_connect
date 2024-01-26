@@ -38,7 +38,7 @@ init([]) ->
         {ok, true} -> [worker(grisp_seawater_ntp, [])];
         {ok, false} -> []
     end,
-    ChildSpecs = NTP ++ [worker(grisp_seawater_client, [])],
+    ChildSpecs = NTP ++ [worker(grisp_seawater_ws, [])],
     {ok, {SupFlags, ChildSpecs}}.
 
 %% internal functions
