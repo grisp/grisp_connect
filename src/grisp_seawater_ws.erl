@@ -24,8 +24,7 @@
     requests = #{}
 }).
 
--define(request_timeout, 5_000).
--define(call_timeout, ?request_timeout + 1000).
+-define(call_timeout, ws_request_timeout() + 1000).
 -define(disconnected_state,
         #state{gun_pid = undefined, gun_ref = undefine, ws_up = false}).
 
@@ -164,7 +163,7 @@ make_request(Caller, Method, Type, Params, #state{requests = Reqs} = State) ->
     Rpc = {request, Method, maps:put(type, Type, Params), ID},
     Msg = grisp_seawater_jsonrpc:encode(Rpc),
     gun:ws_send(State#state.gun_pid, State#state.ws_stream, {text, Msg}),
-    TRef = erlang:start_timer(?request_timeout, self(), ID),
+    TRef = erlang:start_timer(ws_request_timeout(), self(), ID),
     Request = {Caller, TRef},
     {ok, State#state{requests = Reqs#{ID => Request}}}.
 
@@ -204,3 +203,7 @@ id() ->
 shutdown_gun(#state{gun_pid = Pid} = State) ->
     gun:shutdown(Pid),
     State?disconnected_state.
+
+ws_request_timeout() ->
+    {ok, Timeout} = application:get_env(grisp_seawater, seawater_domain),
+    Timeout.
