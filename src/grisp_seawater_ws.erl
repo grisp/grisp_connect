@@ -79,25 +79,25 @@ handle_cast({connect, Server, Port}, #state{gun_pid = undefined} = S) ->
         {ok, GunPid} ->
             {noreply, #state{gun_pid = GunPid}};
         Error ->
-            ?LOG_ERROR("Failed opening TLS connection with reason ~p",[Error]),
+            ?LOG_ERROR(#{event => connection_failure, reason => Error}),
             {noreply, S}
     end;
 handle_cast({connect, _Server, _Port}, S) ->
     {noreply, S}.
 
 handle_info({gun_up, GunPid, _}, #state{gun_pid = GunPid} = S) ->
-    ?LOG_INFO("HTTP connection enstablished, upgrading to WS..."),
+    ?LOG_INFO(#{event => connection_enstablished}),
     GunRef = monitor(process, GunPid),
     WsStream = gun:ws_upgrade(GunPid, "/grisp-connect/ws"),
     NewState = S#state{gun_pid = GunPid, gun_ref = GunRef, ws_stream = WsStream},
     {noreply, NewState};
 handle_info({gun_upgrade, Pid, Stream, [<<"websocket">>], _},
             #state{gun_pid = Pid, ws_stream = Stream} = S) ->
-    ?LOG_INFO("WS Upgraded"),
+    ?LOG_INFO(#{event => ws_upgrade}),
     {noreply, S#state{ws_up = true}};
-handle_info({gun_response, Pid, Stream, _, Status, Headers},
+handle_info({gun_response, Pid, Stream, _, Status, _Headers},
             #state{gun_pid = Pid, ws_stream = Stream} = S) ->
-    ?LOG_ERROR("WS Upgrade fail with status ~p", [Status]),
+    ?LOG_ERROR(#{event => ws_upgrade_failure, status => Status}),
     {noreply, shutdown_gun(S)};
 handle_info({gun_ws, Conn, Stream, {text, JSON}},
             #state{gun_pid = Conn, ws_stream = Stream}= S) ->
@@ -119,14 +119,14 @@ handle_info({timeout, TRef, ID}, #state{requests = Reqs} = State) ->
     end;
 handle_info({gun_down, Pid, ws, closed, [Stream]},
             #state{gun_pid = Pid, ws_stream = Stream, requests = Requests} = S) ->
-    ?LOG_WARNING("Websocket down!"),
+    ?LOG_WARNING(#{event => ws_closed}),
     [begin
         erlang:cancel_timer(Tref),
         gen_server:reply(Caller, {error, ws_closed})
      end || {Caller, Tref} <- maps:values(Requests)],
     {noreply, shutdown_gun(S#state{requests = #{}})};
 handle_info(M, S) ->
-    ?LOG_WARNING("Unandled WS message: ~p", [M]),
+    ?LOG_WARNING(#{event => unhandled_info, info => M}),
     {noreply, S}.
 
 % internal functions -----------------------------
@@ -144,10 +144,10 @@ handle_rpc_messages([{result, _, _} = Res| Batch], Replies, S) ->
     handle_rpc_messages(Batch, Replies, handle_response(Res, S));
 handle_rpc_messages([{error, _Code, _Msg, _Data, _ID} = E | Batch],
                     Replies, S) ->
-    ?LOG_INFO("Received JsonRPC error: ~p",[E]),
+    ?LOG_INFO(#{event => jsonrpc_error, message => E}),
     handle_rpc_messages(Batch, Replies, handle_response(E, S));
 handle_rpc_messages([{internal_error, _, _} = E | Batch], Replies, S) ->
-    ?LOG_ERROR("JsonRPC: ~p",[E]),
+    ?LOG_ERROR(#{event => internal_jsonrpc_error, message => E}),
     handle_rpc_messages(Batch,
                         [grisp_seawater_jsonrpc:format_error(E)| Replies], S).
 
@@ -178,13 +178,13 @@ handle_response(Response, #state{requests = Requests} = S) ->
             erlang:cancel_timer(Tref),
             gen_server:reply(Caller, Reply);
         undefined ->
-            ?LOG_ERROR("Unexpected jsonrpc ~p",[Response])
+            ?LOG_ERROR(#{event => unexpected_response, message => Response})
     end,
     S#state{requests = maps:remove(ID, Requests)}.
 
 flash(Led, Color) ->
     spawn(fun() ->
-        io:format("Flash from Seawater!~n"),
+        ?LOG_NOTICE(#{event => flash, message => "Flash from GRiSP.io!"}),
         grisp_led:color(Led, Color),
         timer:sleep(100),
         grisp_led:off(Led)
