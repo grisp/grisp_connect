@@ -19,8 +19,8 @@ Such client is disabled by default (`{ntp, false}`), and is not required to auth
 Accepts an integer that represents time in milliseconds, default value is `5_000`.
 Allows to tweak the timeout of each API request going through the websocket.
 
-## Basic Low Level API Usage
+## API Usage example
 
-    grisp_io_ws:connect().
+    grisp_io_connection:connect().
     true = grisp_io_ws:is_connected().
-    {ok, <<pong>>} = grisp_io_ws:ping().
+    {ok, <<pong>>} = grisp_io:ping().
