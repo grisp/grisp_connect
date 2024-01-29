@@ -1,6 +1,6 @@
-# grisp_seawater
+# grisp_io
 
-Grisp2 Seawater Client Library
+GRiSP.io Client Library for GRiSP
 
 ## Application env options
 
@@ -21,6 +21,6 @@ Allows to tweak the timeout of each API request going through the websocket.
 
 ## Basic Low Level API Usage
 
-    grisp_seawater_ws:connect().
-    true = grisp_seawater_ws:is_connected().
-    {ok, <<pong>>} = grisp_seawater_ws:ping().
+    grisp_io_ws:connect().
+    true = grisp_io_ws:is_connected().
+    {ok, <<pong>>} = grisp_io_ws:ping().

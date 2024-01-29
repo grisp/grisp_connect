@@ -29,7 +29,7 @@ disconnected() ->
 % gen_statem CALLBACKS ---------------------------------------------------------
 
 init([]) ->
-    {ok, Connect} = application:get_env(grisp_seawater, connect),
+    {ok, Connect} = application:get_env(grisp_io, connect),
     NextState = case Connect of
         true -> waiting_ip;
         false -> idle
@@ -65,13 +65,13 @@ handle_event(state_timeout, retry, waiting_ip, Data) ->
 
 % CONNECTING
 handle_event(enter, _OldState, connecting, _Data) ->
-    {ok, Domain} = application:get_env(grisp_seawater, seawater_domain),
-    {ok, Port} = application:get_env(grisp_seawater, seawater_port),
+    {ok, Domain} = application:get_env(grisp_io, domain),
+    {ok, Port} = application:get_env(grisp_io, port),
     ?LOG_NOTICE(#{event => connecting, domain => Domain, port => Port}),
-    grisp_seawater_ws:connect(Domain, Port),
+    grisp_io_ws:connect(Domain, Port),
     {keep_state_and_data, [{state_timeout, 0, retry}]};
 handle_event(state_timeout, retry, connecting, Data) ->
-    case grisp_seawater_ws:is_connected() of
+    case grisp_io_ws:is_connected() of
         true ->
             ?LOG_NOTICE(#{event => connected}),
             {next_state, connected, Data};

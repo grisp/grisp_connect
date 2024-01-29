@@ -1,4 +1,4 @@
-name: Grisp Seawater CT
+name: grisp_io CT
 
 on:
   push:
@@ -33,4 +33,3 @@ jobs:
           eval `ssh-agent -s`
           ssh-add - <<< '${{ secrets.STRITZINGER_BOT_SSH_KEY }}'
           rebar3 ct
-

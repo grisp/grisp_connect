@@ -1,4 +1,4 @@
--module(grisp_seawater_ntp).
+-module(grisp_io_ntp).
 
 % API
 -export([start_link/0]).
