@@ -206,5 +206,5 @@ shutdown_gun(#state{gun_pid = Pid} = State) ->
     State?disconnected_state.
 
 ws_request_timeout() ->
-    {ok, Timeout} = application:get_env(grisp_io, io_domain),
+    {ok, Timeout} = application:get_env(grisp_io, ws_requests_timeout),
     Timeout.
