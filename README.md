@@ -21,6 +21,6 @@ Allows to tweak the timeout of each API request going through the websocket.
 
 ## API Usage example
 
-    grisp_io_connection:connect().
-    true = grisp_io_ws:is_connected().
+    ok = grisp_io:connect().
+    true = grisp_io:is_connected().
     {ok, <<pong>>} = grisp_io:ping().

@@ -44,6 +44,13 @@ callback_mode() -> [handle_event_function, state_enter].
 
 %%% STATE CALLBACKS ------------------------------------------------------------
 
+% Generic events handling
+handle_event(cast, connect, State, _Data) when State =/= idle ->
+    keep_state_and_data;
+
+
+% STATE MACHINE Transitions
+
 % IDLE
 handle_event(enter, _OldState, idle, _Data) ->
     keep_state_and_data;

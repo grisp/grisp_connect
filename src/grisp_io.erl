@@ -8,18 +8,29 @@
 %--- Exports -------------------------------------------------------------------
 
 % API functions
+-export([connect/0]).
+-export([is_connected/0]).
 -export([ping/0]).
 -export([link_device/0]).
 -export([link_device/1]).
 
 %--- API Functions -------------------------------------------------------------
 
+% @doc Connect to GRiSP.io.
+-spec connect() -> ok.
+connect() ->
+    grisp_io_connection:connect().
+
+% @doc Check if board is connected to GRiSP.io.
+-spec is_connected() -> true | false.
+is_connected() ->
+    grisp_io_ws:is_connected().
+
 % @doc Ping GRiSP.io.
 % Returns 'pong' if the board is linked to an account, 'pang' otherwise.
 -spec ping() -> {ok, binary()} | {error, atom()}.
 ping() ->
     grisp_io_ws:request(post, ping, #{}).
-
 
 % @doc Links the board to a GRiSP.io account.
 % The token is took from the device_linking_token app env.
