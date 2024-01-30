@@ -60,7 +60,7 @@ handle_call(_, _, #state{ws_up = false} = S) ->
 handle_call({request, Method, Type, Params}, From,
             #state{gun_pid = GunPid, ws_stream = WsStream,
                    requests = Requests, ws_up = true} = S) ->
-    {ID, Payload} = grisp_io_jsonrpc_api:request(Method, Type, Params),
+    {ID, Payload} = grisp_io_api:request(Method, Type, Params),
     gun:ws_send(GunPid, WsStream, {text, Payload}),
     TRef = erlang:start_timer(ws_request_timeout(), self(), ID),
     NewRequests = Requests#{ID => {From, TRef}},
@@ -94,7 +94,7 @@ handle_info({gun_response, Pid, Stream, _, Status, _Headers},
 handle_info({gun_ws, Conn, Stream, {text, JSON}},
             #state{gun_pid = Conn, ws_stream = Stream,
                    requests = Requests}= S) ->
-    Replyes = grisp_io_jsonrpc_api:handle_msg(JSON),
+    Replyes = grisp_io_api:handle_msg(JSON),
     NewS = case Replyes of
         [] -> S;
         [{request, Response}] ->

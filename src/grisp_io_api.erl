@@ -1,5 +1,5 @@
 %% @doc Librabry module containing the jsonrpc API logic
--module(grisp_io_jsonrpc_api).
+-module(grisp_io_api).
 
 -export([request/3]).
 -export([handle_msg/1]).
@@ -11,11 +11,11 @@
 request(Method, Type, Params) ->
     ID = id(),
     Rpc = {request, Method, maps:put(type, Type, Params), ID},
-    Encoded = grisp_io_jsonrpc_codec:encode(Rpc),
+    Encoded = grisp_io_jsonrpc:encode(Rpc),
     {ID, Encoded}.
 
 handle_msg(JSON) ->
-    JSON_RPC = grisp_io_jsonrpc_codec:decode(JSON),
+    JSON_RPC = grisp_io_jsonrpc:decode(JSON),
     handle_jsonrpc(JSON_RPC).
 
 %--- Internal Funcitons --------------------------------------------------------
@@ -37,14 +37,14 @@ handle_rpc_messages([{error, _Code, _Msg, _Data, _ID} = E | Batch], Replies) ->
 handle_rpc_messages([{internal_error, _, _} = E | Batch], Replies) ->
     ?LOG_ERROR("JsonRPC: ~p",[E]),
     handle_rpc_messages(Batch,
-                        [grisp_io_jsonrpc_codec:format_error(E)| Replies]).
+                        [grisp_io_jsonrpc:format_error(E)| Replies]).
 
 handle_request(<<"post">>, #{type := <<"flash">>} = Params, ID) ->
     Led = maps:get(led, Params, 1),
     Color = maps:get(color, Params, red),
     {result, flash(Led, Color), ID};
 handle_request(_, _, ID) ->
-    grisp_io_jsonrpc_codec:format_error({internal_error, method_not_found, ID}).
+    grisp_io_jsonrpc:format_error({internal_error, method_not_found, ID}).
 
 handle_response(Response) ->
     {ID, Reply} = case Response of

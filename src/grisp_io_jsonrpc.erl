@@ -1,4 +1,4 @@
--module(grisp_io_jsonrpc_codec).
+-module(grisp_io_jsonrpc).
 
 % API
 -export([decode/1]).
