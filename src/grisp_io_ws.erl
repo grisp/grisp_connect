@@ -45,7 +45,7 @@ is_connected() ->
     gen_server:call(?MODULE, ?FUNCTION_NAME).
 
 request(Method, Type, Params) ->
-    gen_statem:call(?MODULE,
+    gen_server:call(?MODULE,
                     {?FUNCTION_NAME, Method, Type, Params},
                     ?call_timeout).
 

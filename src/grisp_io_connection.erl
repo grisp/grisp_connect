@@ -24,7 +24,7 @@ connect() ->
     gen_statem:cast(?MODULE, ?FUNCTION_NAME).
 
 disconnected() ->
-    gen_statem:castl(?MODULE, ?FUNCTION_NAME).
+    gen_statem:cast(?MODULE, ?FUNCTION_NAME).
 
 % gen_statem CALLBACKS ---------------------------------------------------------
 
