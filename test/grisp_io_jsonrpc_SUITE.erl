@@ -32,14 +32,14 @@ positional_parameters(_) ->
                            <<"\"params\":[42,23]">>], Json)).
 
 named_parameters(_) ->
-    Term = {request, <<"subtract">>, #{<<"subtrahend">> => 23, <<"minuend">> => 42}, 2},
-    Json = <<"{\"id\":2,\"jsonrpc\":\"2.0\",\"method\":\"subtract\",\"params\":{\"minuend\":42,\"subtrahend\":23}}">>,
+    Term = {request, <<"divide">>, #{<<"dividend">> => 42, <<"divisor">> => 2}, 2},
+    Json = <<"{\"id\":2,\"jsonrpc\":\"2.0\",\"method\":\"divide\",\"params\":{\"dividend\":42,\"divisor\":2}}">>,
     ?assertMatch({single, Term}, grisp_io_jsonrpc:decode(Json)),
     Json = grisp_io_jsonrpc:encode(Term),
     ?assert(jsonrpc_check([<<"\"id\":2">>,
-                           <<"\"method\":\"subtract\"">>,
-                           <<"\"minuend\":42">>,
-                           <<"\"subtrahend\":23">>], Json)).
+                           <<"\"method\":\"divide\"">>,
+                           <<"\"dividend\":42">>,
+                           <<"\"divisor\":2">>], Json)).
 
 notification(_) ->
     Term = {notification, <<"update">>, [1,2,3,4,5]},
