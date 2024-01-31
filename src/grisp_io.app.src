@@ -13,6 +13,9 @@
         gun,
         jsx
     ]},
+    {optional_applications, [
+        grisp_cryptoauth
+    ]},
     {env, [
         {domain, "grisp.io"},
         {port, 7777},
