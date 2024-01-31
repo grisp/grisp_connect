@@ -1,4 +1,4 @@
--module(jsonrpc_SUITE).
+-module(grisp_io_jsonrpc_SUITE).
 
 -include_lib("stdlib/include/assert.hrl").
 
