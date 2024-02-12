@@ -2,7 +2,11 @@
 
 -compile([export_all, nowarn_export_all]).
 
-start(PrivDir, CertDir) ->
+
+-include_lib("common_test/include/ct.hrl").
+
+start(CertDir, Config) ->
+    PrivDir = ?config(priv_dir, Config),
     application:set_env(mnesia, dir, PrivDir),
 
     eresu:install([node()]),
@@ -32,7 +36,7 @@ start(PrivDir, CertDir) ->
     kraft:start(KraftOpts, KraftRoutes),
 
     {ok, Started3} = application:ensure_all_started(grisp_manager),
-    Started1 ++ Started2 ++ Started3.
+    [{apps, Started1 ++ Started2 ++ Started3} | Config].
 
 cleanup_apps(Apps) ->
     mnesia:delete_table(eresu_user),
@@ -40,13 +44,6 @@ cleanup_apps(Apps) ->
     mnesia:delete_table(grisp_manager_token),
     [application:stop(App) || App <- Apps],
     application:stop(mnesia).
-
-get_cert_dir(DataDir) ->
-    SplitDataDir = filename:split(DataDir),
-    JoinedParentDir = filename:join(lists:droplast(SplitDataDir)),
-    CertDir = filename:join(JoinedParentDir, "certs"),
-    true = filelib:is_dir(CertDir),
-    CertDir.
 
 register_user() ->
     Hash = erlpass:hash(<<"1234">>),

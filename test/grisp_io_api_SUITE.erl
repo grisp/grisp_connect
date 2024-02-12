@@ -18,15 +18,14 @@ all() ->
 
 init_per_suite(Config) ->
     PrivDir = ?config(priv_dir, Config),
-    DataDir = ?config(data_dir, Config),
-    CertDir = grisp_io_manager:get_cert_dir(DataDir),
+    CertDir =  filename:join(?config(data_dir, Config), "certs"),
 
     PolicyFile = filename:join(PrivDir, "policies.term"),
     ?assertEqual(ok, file:write_file(PolicyFile, <<>>)),
     application:set_env(seabac, policy_file, PolicyFile),
 
-    Apps = grisp_io_manager:start(PrivDir, CertDir),
-    [{cert_dir, CertDir} | [{apps, Apps} | Config]].
+    Config2 = grisp_io_manager:start(CertDir, Config),
+    [{cert_dir, CertDir} | Config2].
 
 end_per_suite(Config) ->
     grisp_io_manager:cleanup_apps(?config(apps, Config)).
