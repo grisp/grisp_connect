@@ -1,8 +1,8 @@
--module(grisp_io_test_util).
+-module(grisp_io_manager).
 
 -compile([export_all, nowarn_export_all]).
 
-start_apps(PrivDir, CertDir) ->
+start(PrivDir, CertDir) ->
     application:set_env(mnesia, dir, PrivDir),
 
     eresu:install([node()]),
@@ -27,15 +27,7 @@ start_apps(PrivDir, CertDir) ->
     },
     KraftRoutes = [
         {"/grisp-connect/ws",
-            {ws, grisp_manager_device_api}, #{}, #{type => json_rpc}},
-        {"/grisp-manager/ws",
-            {ws, seawapper_ws},
-            #{app => grisp_manager, jsonrpc_api => grisp_manager_ui_api},
-            #{type => json_rpc}},
-        {"/grisp-manager/downloads/:id",
-            {cowboy, grisp_manager_downloads}, #{}},
-        {"/",
-            kraft_static, #{}}
+            {ws, grisp_manager_device_api}, #{}, #{type => json_rpc}}
     ],
     kraft:start(KraftOpts, KraftRoutes),
 

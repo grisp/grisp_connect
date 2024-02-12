@@ -19,17 +19,17 @@ all() ->
 init_per_suite(Config) ->
     PrivDir = ?config(priv_dir, Config),
     DataDir = ?config(data_dir, Config),
-    CertDir = grisp_io_test_util:get_cert_dir(DataDir),
+    CertDir = grisp_io_manager:get_cert_dir(DataDir),
 
     PolicyFile = filename:join(PrivDir, "policies.term"),
     ?assertEqual(ok, file:write_file(PolicyFile, <<>>)),
     application:set_env(seabac, policy_file, PolicyFile),
 
-    Apps = grisp_io_test_util:start_apps(PrivDir, CertDir),
+    Apps = grisp_io_manager:start(PrivDir, CertDir),
     [{cert_dir, CertDir} | [{apps, Apps} | Config]].
 
 end_per_suite(Config) ->
-    grisp_io_test_util:cleanup_apps(?config(apps, Config)).
+    grisp_io_manager:cleanup_apps(?config(apps, Config)).
 
 init_per_testcase(_, Config) ->
     {ok, _} = application:ensure_all_started(grisp_emulation),
