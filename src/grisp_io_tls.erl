@@ -27,6 +27,19 @@ connect(ServerName, Port) ->
 
 %--- Internal Functions --------------------------------------------------------
 
+-ifdef(TEST).
+
+ssl_opts(_) ->
+    {ok, CertDir} = application:get_env(grisp_io, test_cert_dir),
+    Priv = code:priv_dir(grisp_io),
+    {ok, [
+        {verify, verify_none},
+        {keyfile, filename:join(CertDir, "client.key")},
+        {certfile, filename:join(CertDir, "client.crt")}
+    ]}.
+
+-else.
+
 ssl_opts(ServerName) ->
     case client_chain() of
         {error, _Reason} = Error -> Error;
@@ -45,6 +58,8 @@ ssl_opts(ServerName) ->
                 }}
             ]}
     end.
+
+-endif.
 
 client_chain() ->
     ClientCert = grisp_cryptoauth:read_cert(primary, der),

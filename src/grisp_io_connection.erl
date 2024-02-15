@@ -24,7 +24,7 @@ connect() ->
     gen_statem:cast(?MODULE, ?FUNCTION_NAME).
 
 disconnected() ->
-    gen_statem:castl(?MODULE, ?FUNCTION_NAME).
+    gen_statem:cast(?MODULE, ?FUNCTION_NAME).
 
 % gen_statem CALLBACKS ---------------------------------------------------------
 
@@ -43,6 +43,13 @@ code_change(_Vsn, State, Data, _Extra) -> {ok, State, Data}.
 callback_mode() -> [handle_event_function, state_enter].
 
 %%% STATE CALLBACKS ------------------------------------------------------------
+
+% Generic events handling
+handle_event(cast, connect, State, _Data) when State =/= idle ->
+    keep_state_and_data;
+
+
+% STATE MACHINE Transitions
 
 % IDLE
 handle_event(enter, _OldState, idle, _Data) ->
