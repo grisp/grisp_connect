@@ -47,14 +47,14 @@ end_per_testcase(_, Config) ->
 %--- Tests ---------------------------------------------------------------------
 
 auto_connect_test(_) ->
-    assert_connection().
+    ?assertMatch(ok, wait_connection(10)).
 
 ping_test(_) ->
-    assert_connection(),
+    ?assertMatch(ok, wait_connection(10)),
     ?assertMatch({ok, <<"pang">>}, grisp_io:ping()).
 
 link_device_test(_) ->
-    assert_connection(),
+    ?assertMatch(ok, wait_connection(10)),
     ?assertMatch({error, token_undefined}, grisp_io:link_device()),
     application:set_env(grisp_io, device_linking_token, <<"token">>),
     ?assertMatch({error, invalid_token}, grisp_io:link_device()),
@@ -65,9 +65,15 @@ link_device_test(_) ->
 
 %--- Internal ------------------------------------------------------------------
 
-assert_connection() ->
-    ct:sleep(1000),
-    ?assert(grisp_io:is_connected()).
+wait_connection(0) ->
+    {error, timeout};
+wait_connection(N) ->
+    case grisp_io:is_connected() of
+       true -> ok;
+       false ->
+           ct:sleep(100),
+           wait_connection(N - 1)
+    end.
 
 flush() ->
     receive Any -> ct:pal("Flushed: ~p", [Any]), flush()
