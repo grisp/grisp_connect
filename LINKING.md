@@ -21,15 +21,16 @@ You are free to use the grisp_io API in your code or procede manually while conn
 to create your GRiSP2 application project and learn how to deploy
 
     - **Optional:** if you do not want to type the device_linking_token at runtime
-you can add it to the application env variables in your release config (e.g. `config/sys.config`)
-        ```
-        [
-            {grisp_io, [
-                {device_linking_token, <<"...">>}
-            ]}
-        ].
-        ```
-        Copy in there the Linking Token you precedently generated on the web page.
+you can add it to the application env variables in your release confi. (e.g. `config/sys.config`)
+Copy in there the Linking Token you precedently generated on the web page.
+```
+[
+    {grisp_io, [
+        {device_linking_token, <<"...">>}
+    ]}
+].
+```
+
 2. Follow the tutorial until you are able to deploy your app on the board.
 
 
