@@ -1,5 +1,5 @@
 %% @doc State machine to ensure connectivity with grisp.io
--module(grisp_io_connection).
+-module(grisp_io_client).
 
 % External API
 -export([start_link/0]).
@@ -14,6 +14,7 @@
 -include_lib("kernel/include/logger.hrl").
 
 -define(STD_TIMEOUT, 1000).
+
 
 % API
 

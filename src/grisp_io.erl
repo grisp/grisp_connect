@@ -19,7 +19,7 @@
 % @doc Connect to GRiSP.io.
 -spec connect() -> ok.
 connect() ->
-    grisp_io_connection:connect().
+    grisp_io_client:connect().
 
 % @doc Check if board is connected to GRiSP.io.
 -spec is_connected() -> true | false.
