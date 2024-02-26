@@ -4,7 +4,7 @@ GRiSP.io Client Library for GRiSP
 
 Add this application as a dependency in your GRiSP2 project.
 Your board will connect securely through Mutual TLS to the [GRiSP.io](https://grisp.io) services.
-See this [LINKING](https://github.com/grisp/grisp_io/blob/main/LINKING.md) guide on how to start using your GRiSP2 board with GRiSP.io
+See the [Board Registration](https://github.com/grisp/grisp_io/blob/main/Board_Registration.md) guide on how to start using your GRiSP2 board with GRiSP.io
 
 ## Application env options
 
