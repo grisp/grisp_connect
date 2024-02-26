@@ -26,7 +26,7 @@ For a hassle-free experience:
 
 If you prefer a hands-on approach or need custom setup:
 
-1. **Project Setup:** Follow the [GRiSP Wiki](https://github.com/grisp/grisp/wiki) for instructions on creating and deploying your GRiSP2 application. Before proceeding, ensure `grisp_io` is added to your project's dependencies. This is a crucial step for manual linking.
+1. **Project Setup:** Follow the [GRiSP Wiki](https://github.com/grisp/grisp/wiki) for instructions on creating and deploying your GRiSP2 application. Before proceeding, ensure `grisp_io` is added to your project's dependencies. Make sure `grisp_io` is started by adding it under `applications` section in your `myapp.app.src` file; this is a crucial step for manual linking.
 
    - **Optional Configuration:** To streamline the process, include the device_linking_token in your project's release configuration (`config/sys.config`):
     ```erlang
