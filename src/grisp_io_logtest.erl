@@ -42,7 +42,7 @@ handle_info({timeout, OldRef, logs}, #state{timer = OldRef} = S)->
              [length(Events), Dropped]),
     case send_logs(Chunk) of
         ok -> ok;
-        {ok, #{<<"seq">> := Seq, <<"dropped">> := ServerDropped}} ->
+        {ok, #{seq := Seq, dropped := ServerDropped}} ->
             dab_logger_bin:sync(Seq, ServerDropped);
         E ->
             io:format("Error sending logs = ~p\n",[E])
