@@ -87,9 +87,9 @@ handle_event({call, From}, {request, Method, Type, Params}, connected,
 
 handle_event(cast, {handle_message, Payload}, connected,
             #data{requests = Requests} = Data) ->
-    Replyes = grisp_io_api:handle_msg(Payload),
+    Replies = grisp_io_api:handle_msg(Payload),
     % A reduce operation is needed to support jsonrpc batch comunications
-    case Replyes of
+    case Replies of
         [] ->
             keep_state_and_data;
         [{request, Response}] -> % Response for a GRiSP.io request
