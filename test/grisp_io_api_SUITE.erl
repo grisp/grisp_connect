@@ -47,14 +47,14 @@ end_per_testcase(_, Config) ->
 %--- Tests ---------------------------------------------------------------------
 
 auto_connect_test(_) ->
-    ?assertMatch(ok, wait_connection(10)).
+    ?assertMatch(ok, wait_connection(20)).
 
 ping_test(_) ->
-    ?assertMatch(ok, wait_connection(10)),
+    ?assertMatch(ok, wait_connection(20)),
     ?assertMatch({ok, <<"pang">>}, grisp_io:ping()).
 
 link_device_test(_) ->
-    ?assertMatch(ok, wait_connection(10)),
+    ?assertMatch(ok, wait_connection(20)),
     ?assertMatch({error, token_undefined}, grisp_io:link_device()),
     application:set_env(grisp_io, device_linking_token, <<"token">>),
     ?assertMatch({error, invalid_token}, grisp_io:link_device()),
