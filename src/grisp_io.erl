@@ -19,18 +19,18 @@
 % @doc Connect to GRiSP.io.
 -spec connect() -> ok.
 connect() ->
-    grisp_io_connection:connect().
+    grisp_io_client:connect().
 
 % @doc Check if board is connected to GRiSP.io.
 -spec is_connected() -> true | false.
 is_connected() ->
-    grisp_io_ws:is_connected().
+    grisp_io_client:is_connected().
 
 % @doc Ping GRiSP.io.
 % Returns 'pong' if the board is linked to an account, 'pang' otherwise.
 -spec ping() -> {ok, binary()} | {error, atom()}.
 ping() ->
-    grisp_io_ws:request(post, ping, #{}).
+    grisp_io_client:request(post, ping, #{}).
 
 % @doc Links the board to a GRiSP.io account.
 % The token is took from the device_linking_token app env.
@@ -46,4 +46,4 @@ link_device() ->
 -spec link_device(Token :: binary()) ->
     {ok, binary()} | {error, invalid_token}.
 link_device(Token) ->
-    grisp_io_ws:request(post, device_linking_token, #{token => Token}).
+    grisp_io_client:request(post, device_linking_token, #{token => Token}).
