@@ -1,12 +1,19 @@
-%% @doc State machine to ensure connectivity with grisp.io
+%% @doc Client to interact with grisp.io
+%%
+%% This module contains a state machine to ensure connectivity with grisp.io.
+%% JsonRPC traffic is managed here.
+%% @end
 -module(grisp_io_client).
 
 % External API
 -export([start_link/0]).
 -export([connect/0]).
+-export([is_connected/0]).
+-export([request/3]).
 
 % Internal API
 -export([disconnected/0]).
+-export([handle_message/1]).
 
 -behaviour(gen_statem).
 -export([init/1, terminate/3, code_change/4, callback_mode/0, handle_event/4]).
@@ -15,6 +22,9 @@
 
 -define(STD_TIMEOUT, 1000).
 
+-record(data, {
+    requests = #{}
+}).
 
 % API
 
@@ -24,8 +34,17 @@ start_link() ->
 connect() ->
     gen_statem:cast(?MODULE, ?FUNCTION_NAME).
 
+is_connected() ->
+    gen_statem:call(?MODULE, ?FUNCTION_NAME).
+
+request(Method, Type, Params) ->
+    gen_statem:call(?MODULE, {?FUNCTION_NAME, Method, Type, Params}).
+
 disconnected() ->
     gen_statem:cast(?MODULE, ?FUNCTION_NAME).
+
+handle_message(Payload) ->
+    gen_statem:cast(?MODULE, {?FUNCTION_NAME, Payload}).
 
 % gen_statem CALLBACKS ---------------------------------------------------------
 
@@ -35,7 +54,7 @@ init([]) ->
         true -> waiting_ip;
         false -> idle
     end,
-    {ok, NextState, []}.
+    {ok, NextState, #data{}}.
 
 terminate(_Reason, _State, _Data) -> ok.
 
@@ -49,6 +68,47 @@ callback_mode() -> [handle_event_function, state_enter].
 handle_event(cast, connect, State, _Data) when State =/= idle ->
     keep_state_and_data;
 
+handle_event({call, From}, is_connected, connected, _) ->
+    {keep_state_and_data, [{reply, From, true}]};
+handle_event({call, From}, is_connected, _, _) ->
+    {keep_state_and_data, [{reply, From, false}]};
+
+handle_event({call, From}, {request, _, _, _}, State, _Data)
+when State =/= connected ->
+    {keep_state_and_data, [{reply, From, {error, disconnected}}]};
+handle_event({call, From}, {request, Method, Type, Params}, connected,
+            #data{requests = Requests} = Data) ->
+    {ID, Payload} = grisp_io_api:request(Method, Type, Params),
+    grisp_io_ws:send(Payload),
+    NewRequests = Requests#{ID => From},
+    {keep_state,
+     Data#data{requests = NewRequests},
+     [{{timeout, ID}, request_timeout(), request}]};
+
+handle_event(cast, {handle_message, Payload}, connected,
+            #data{requests = Requests} = Data) ->
+    Replyes = grisp_io_api:handle_msg(Payload),
+    % A reduce operation is needed to support jsonrpc batch comunications
+    case Replyes of
+        [] ->
+            keep_state_and_data;
+        [{request, Response}] -> % Response for a GRiSP.io request
+            grisp_io_ws:send(Response),
+            keep_state_and_data;
+        [{response, ID, Response}] -> % GRiSP.io response
+            {OtherRequests, Actions} = dispatch_response(ID, Response, Requests),
+            {keep_state, Data#data{requests = OtherRequests}, Actions}
+    end;
+
+handle_event({timeout, ID}, request, connected,
+            #data{requests = Requests} = Data) ->
+    Caller = maps:get(ID, Requests),
+    {keep_state,
+        Data#data{requests = maps:remove(ID, Requests)},
+        [{reply, Caller, {error, timeout}}]};
+
+handle_event({call, From}, _, State, Data) ->
+    {keep_state, Data, [{reply, From, {bad_client_state, State}}]};
 
 % STATE MACHINE Transitions
 
@@ -103,6 +163,23 @@ handle_event(E, OldS, NewS, Data) ->
     {keep_state, Data}.
 
 % INTERNALS --------------------------------------------------------------------
+
+dispatch_response(ID, Response, Requests) ->
+    case maps:take(ID, Requests) of
+        {Caller, OtherRequests} ->
+            Actions = [{{timeout, ID}, cancel}, {reply, Caller, Response}],
+            {OtherRequests, Actions};
+        error ->
+            ?LOG_DEBUG(#{event => ?FUNCTION_NAME, reason => {missing_id, ID},
+                         data => Response}),
+            {Requests, []}
+    end.
+
+request_timeout() ->
+    {ok, V} = application:get_env(grisp_io, ws_requests_timeout),
+    V.
+
+% IP check functions
 
 check_inet_ipv4() ->
     case get_ip_of_valid_interfaces() of
