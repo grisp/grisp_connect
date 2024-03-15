@@ -14,6 +14,7 @@
 % Internal API
 -export([disconnected/0]).
 -export([handle_message/1]).
+-export([trigger_logs/0]).
 
 -behaviour(gen_statem).
 -export([init/1, terminate/3, code_change/4, callback_mode/0, handle_event/4]).
@@ -45,6 +46,9 @@ disconnected() ->
 
 handle_message(Payload) ->
     gen_statem:cast(?MODULE, {?FUNCTION_NAME, Payload}).
+
+trigger_logs() ->
+    gen_statem:cast(?MODULE, ?FUNCTION_NAME).
 
 % gen_statem CALLBACKS ---------------------------------------------------------
 
@@ -150,10 +154,19 @@ handle_event(state_timeout, retry, connecting, Data) ->
 
 % CONNECTED
 handle_event(enter, _OldState, connected, _Data) ->
+    trigger_logs(),
     keep_state_and_data;
+handle_event(cast, trigger_logs, connected, _Data) ->
+    {ok, Interval} = application:get_env(grisp_io, ws_logs_interval),
+    TriggerLogs = {state_timeout, Interval, send_logs},
+    {keep_state_and_data, [TriggerLogs]};
 handle_event(cast, disconnected, connected, Data) ->
     ?LOG_WARNING(#{event => disconnected}),
-    {next_state, waiting_ip, Data};
+    StopLogs = {state_timeout, infinity, send_logs},
+    {next_state, waiting_ip, Data, [StopLogs]};
+handle_event(state_timeout, send_logs, connected, _) ->
+    async_send_logs(),
+    keep_state_and_data;
 
 handle_event(E, OldS, NewS, Data) ->
     ?LOG_ERROR(#{event => unhandled_gen_statem_event,
@@ -178,6 +191,30 @@ dispatch_response(ID, Response, Requests) ->
 request_timeout() ->
     {ok, V} = application:get_env(grisp_io, ws_requests_timeout),
     V.
+
+async_send_logs() ->
+    spawn(fun () ->
+        {ok, Size} = application:get_env(grisp_io, ws_logs_batch_size),
+        case grisp_io_logger_bin:chunk(Size) of
+            {[], _Dropped} -> ok;
+            Chunk -> send_logs_chunk(Chunk)
+        end,
+        trigger_logs()
+    end).
+
+send_logs_chunk({Events, Dropped}) ->
+    io:format("Sending logs... events = ~p, dropped = ~p\n",
+             [length(Events), Dropped]),
+    LogUpdate = #{
+        events => [[Seq, E] || {Seq, E} <- Events],
+        dropped => Dropped
+    },
+    case request(post, logs, LogUpdate) of
+        {ok, #{seq := Seq, dropped := ServerDropped}} ->
+            grisp_io_logger_bin:sync(Seq, ServerDropped);
+        E ->
+            io:format("Error sending logs = ~p\n",[E])
+    end.
 
 % IP check functions
 
