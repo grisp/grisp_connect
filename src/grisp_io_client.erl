@@ -203,8 +203,6 @@ async_send_logs() ->
     end).
 
 send_logs_chunk({Events, Dropped}) ->
-    io:format("Sending logs... events = ~p, dropped = ~p\n",
-             [length(Events), Dropped]),
     LogUpdate = #{
         events => [[Seq, E] || {Seq, E} <- Events],
         dropped => Dropped
