@@ -23,6 +23,15 @@ Such client is disabled by default (`{ntp, false}`), and is not required to auth
 Accepts an integer that represents time in milliseconds, default value is `5_000`.
 Allows to tweak the timeout of each API request going through the websocket.
 
+### ws_logs_interval
+
+Accepts an integer that represents time in milliseconds, default value is `2_000`.
+Sets the intervall between each log batch dispatch to grisp.io.
+
+### ws_logs_batch_size
+
+Accepts an integer that represents the maximum number of logs that can be batched togheder, default value is `100`.
+
 ## API Usage example
 
     ok = grisp_io:connect().
