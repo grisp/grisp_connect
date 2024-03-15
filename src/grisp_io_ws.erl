@@ -89,7 +89,7 @@ handle_info({gun_ws, Conn, Stream, {text, Text}},
     {noreply, S};
 handle_info({gun_down, Pid, ws, closed, [Stream]}, #state{gun_pid = Pid, ws_stream = Stream} = S) ->
     ?LOG_WARNING(#{event => ws_closed}),
-    grisp_io_connection:disconnected(),
+    grisp_io_client:disconnected(),
     {noreply, shutdown_gun(S)};
 handle_info(M, S) ->
     ?LOG_WARNING(#{event => unhandled_info, info => M}),
