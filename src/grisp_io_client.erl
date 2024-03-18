@@ -144,7 +144,7 @@ handle_event(state_timeout, retry, connecting, Data) ->
             ?LOG_NOTICE(#{event => connected}),
             {next_state, connected, Data};
         false ->
-            ?LOG_NOTICE(#{event => waiting_ws_connection}),
+            ?LOG_INFO(#{event => waiting_ws_connection}),
             {keep_state_and_data, [{state_timeout, ?STD_TIMEOUT, retry}]}
     end;
 
