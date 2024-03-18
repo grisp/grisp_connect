@@ -1,3 +1,9 @@
+%% @doc Ring buffer for storing logger logs
+%%
+%% This module extends a standard queue into a ring buffer.
+%% It can be truncated once a batch of logs has been sent out
+%% and is not needed anymore.
+%% @end
 -module(grisp_io_binlog).
 
 % API

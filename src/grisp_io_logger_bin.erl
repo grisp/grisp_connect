@@ -1,3 +1,11 @@
+%% @doc Log handler and formatter for the logger app
+%%
+%% It is optimized to use a fixed size ring buffer and
+%% return chucks of older logs first while storing new ones.
+%% It can be synched to discard old logs if they are not needed anymore.
+%% If the buffer is filled, oldest logs are dropped
+%% and a fake logger event is inserted to inform the user.
+%% @end
 -module(grisp_io_logger_bin).
 
 -include_lib("kernel/include/logger.hrl").
