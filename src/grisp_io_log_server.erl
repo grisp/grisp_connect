@@ -60,5 +60,5 @@ send_logs_chunk({Events, Dropped}) ->
         {ok, #{seq := Seq, dropped := ServerDropped}} ->
             grisp_io_logger_bin:sync(Seq, ServerDropped);
         E ->
-            ?LOG_WARNING("Error sending logs = ~p\n",[E])
+            ?LOG_ERROR(#{event => send_logs, data => E})
     end.
