@@ -40,6 +40,7 @@ init([]) ->
     end,
     ChildSpecs = NTP ++ [
         worker(grisp_io_ws, []),
+        worker(grisp_io_log_server, []),
         worker(grisp_io_client, [])
     ],
     {ok, {SupFlags, ChildSpecs}}.
