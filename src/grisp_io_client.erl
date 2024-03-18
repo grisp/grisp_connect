@@ -157,7 +157,7 @@ handle_event(enter, _OldState, connected, _Data) ->
     trigger_logs(),
     keep_state_and_data;
 handle_event(cast, trigger_logs, connected, _Data) ->
-    {ok, Interval} = application:get_env(grisp_io, ws_logs_interval),
+    {ok, Interval} = application:get_env(grisp_io, logs_interval),
     TriggerLogs = {state_timeout, Interval, send_logs},
     {keep_state_and_data, [TriggerLogs]};
 handle_event(cast, disconnected, connected, Data) ->
@@ -194,7 +194,7 @@ request_timeout() ->
 
 async_send_logs() ->
     spawn(fun () ->
-        {ok, Size} = application:get_env(grisp_io, ws_logs_batch_size),
+        {ok, Size} = application:get_env(grisp_io, logs_batch_size),
         case grisp_io_logger_bin:chunk(Size) of
             {[], _Dropped} -> ok;
             Chunk -> send_logs_chunk(Chunk)
