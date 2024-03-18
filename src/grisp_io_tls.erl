@@ -41,13 +41,17 @@ ssl_opts(_) ->
 -else.
 
 ssl_opts(ServerName) ->
+    ServerOpts = case server_chain(ServerName) of
+        [] -> [];
+        Chain -> [{cacerts, Chain}]
+    end,
     case client_chain() of
         {error, _Reason} = Error -> Error;
         {ok, ClientChain} ->
             {ok, [
                 {verify, verify_peer},
                 {depth, 99},
-                {cacerts, certifi:cacerts() ++ server_chain(ServerName)},
+                {cacertfile, certifi:cacertfile()},
                 {cert, ClientChain},
                 {customize_hostname_check, [
                     {match_fun, public_key:pkix_verify_hostname_match_fun(https)}
@@ -56,7 +60,7 @@ ssl_opts(ServerName) ->
                     algorithm => ecdsa,
                     sign_fun => {grisp_cryptoauth, sign_fun}
                 }}
-            ]}
+            ] ++ ServerOpts}
     end.
 
 -endif.
