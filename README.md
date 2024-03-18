@@ -30,7 +30,7 @@ Sets the intervall between each log batch dispatch to grisp.io.
 
 ### logs_batch_size
 
-Accepts an integer that represents the maximum number of logs that can be batched togheder, default value is `100`.
+Accepts an integer that represents the maximum number of logs that can be batched together, default value is `100`.
 
 ## API Usage example
 
