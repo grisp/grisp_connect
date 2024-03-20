@@ -49,6 +49,10 @@ handle_info(send_logs, #state{active = true} = State) ->
         {[], _Dropped} -> ok;
         Chunk -> send_logs_chunk(Chunk)
     end,
+    {noreply, State};
+handle_info(send_logs, #state{active = false, timer = undefined} = State) ->
+    ?LOG_WARNING(#{event => send_logs,
+                   msg => "send_logs received when inactive"}),
     {noreply, State}.
 
 send_logs_chunk({Events, Dropped}) ->
