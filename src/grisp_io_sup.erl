@@ -38,6 +38,15 @@ init([]) ->
         {ok, true} -> [worker(grisp_io_ntp, [])];
         {ok, false} -> []
     end,
+%% Notes:
+%% The one_for_all strategy is required as the processes
+%% are strictly interdependent and work together:
+%% grisp_io_client
+%%      controlls grisp_io_log_server via gen_server:cast
+%% grisp_io_log_server
+%%      uses grisp_io_client via gen_server:call to send logs
+%% grisp_io_ws
+%%      is directly and exclusively controlled by grisp_io_client
     ChildSpecs = NTP ++ [
         worker(grisp_io_ws, []),
         worker(grisp_io_log_server, []),
