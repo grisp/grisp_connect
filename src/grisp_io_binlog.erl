@@ -80,7 +80,7 @@ truncate(To, #binlog{seq = Seq} = L) when To >= Seq ->
     clear(L);
 truncate(To, #binlog{queue = Q0} = L) ->
     case queue:out(Q0) of
-        {{value, {Seq, Bin}}, Q1} when Seq < To ->
+        {{value, {Seq, Bin}}, Q1} when Seq =< To ->
             truncate(To, drop(Q1, Bin, L));
         _ ->
             L

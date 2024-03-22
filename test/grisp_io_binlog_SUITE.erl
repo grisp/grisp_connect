@@ -94,7 +94,7 @@ truncate(_Config) ->
     ?assertEqual(L0, truncate(5, L0)),
     {L1, D1} = insert_many([{N, <<>>} || N <- lists:seq(1, 10)], L0),
     ?assertEqual(0, D1),
-    ?assertItems([{N, <<>>} || N <- lists:seq(5, 10)], truncate(5, L1)),
+    ?assertItems([{N, <<>>} || N <- lists:seq(6, 10)], truncate(5, L1)),
     ?assertItems([], truncate(15, L1)),
     ?assertEqual(10, seq(L1)).
 
