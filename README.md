@@ -37,3 +37,39 @@ Accepts an integer that represents the maximum number of logs that can be batche
     ok = grisp_io:connect().
     true = grisp_io:is_connected().
     {ok, <<pong>>} = grisp_io:ping().
+
+## See all logs from boot on GRiSP.io
+
+Once this app is started, it forwards all logs to GRiSP.io without the need of setting up anything. The only logs that we do not catch are the ones generated before `grisp_io` boots.
+If you want to see ALL logs, even from applications that boot before `grisp_io`, you need to disable the default logger and set our logger as the default one. This involves changing the `kernel` and `grisp_io` app configuration settings in your sys.config file.
+
+You can copy paste these settings. Here we both swap the default logger with ours and also request our logger to print logs to stdout.
+```erlang
+% sys.config
+[
+    {kernel, [
+        {logger_level, debug},
+        % Disable 'default' handler (which buffers all log events in logger).
+        {logger, [{handler, default, undefined}]}
+    ]},
+    {grisp_io,[
+        {logger, [
+            % Enable our own default handler,
+            % which will receive all events from boot
+            {handler,
+             default,
+             grisp_io_logger_bin,
+             #{
+                formatter => {grisp_io_logger_bin, #{
+                    % If you want to see logs printed on the USB serial,
+                    % here you can appoint a logger formatter module of your choice
+                    % and set your preferred configuration for OTP logs
+                    % setting: stdout => {Formatter, FormatterConfig}
+                    stdout => {logger_formatter, #{}}
+                }}
+             }
+            }
+        ]}
+    ]}
+].
+```

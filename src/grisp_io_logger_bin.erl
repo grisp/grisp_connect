@@ -101,7 +101,6 @@ format(Event, Config) ->
     case EncodedSize > ?MAX_LOG_BYTES of
         true ->
             NewLog = log_discard(EncodedSize),
-            io:format("Replacing big log with ~p~n",[NewLog]),
             base64:encode(term_to_binary(NewLog));
         false ->
             Encoded
