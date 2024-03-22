@@ -19,6 +19,11 @@
     timer :: undefined | timer:tref()
 }).
 
+% FixMe:
+% Sending over ~30_000 bytes over WS breaks rtems I/O driver.
+% We want avoid to return chunks that are bigger then that.
+-define(MAX_CHUNK_BYTES, 30_000).
+
 % API
 
 start_link() ->
@@ -45,7 +50,7 @@ handle_cast(stop, State) ->
 
 handle_info(send_logs, #state{active = true} = State) ->
     {ok, Size} = application:get_env(grisp_io, logs_batch_size),
-    case grisp_io_logger_bin:chunk(Size) of
+    case grisp_io_logger_bin:chunk(Size, ?MAX_CHUNK_BYTES) of
         {[], _Dropped} -> ok;
         Chunk -> send_logs_chunk(Chunk)
     end,

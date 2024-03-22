@@ -12,7 +12,7 @@
 
 % API
 -export([sync/2]).
--export([chunk/1]).
+-export([chunk/2]).
 
 % Logger Callbacks
 -export([adding_handler/1]).
@@ -55,7 +55,6 @@
 % FixMe:
 % Sending over ~30_000 bytes over WS breaks rtems I/O driver.
 % We want avoid to return chunks that are bigger then that.
-% -define(MAX_CHUNK_BYTES, 30_000).
 -define(MAX_LOG_BYTES, 30_000).
 
 %--- API -----------------------------------------------------------------------
@@ -65,7 +64,11 @@ sync(Seq, DroppedConfirmed) when
 ->
     call(whereis(?MODULE), {sync, Seq, DroppedConfirmed}).
 
-chunk(Count) -> insert_drop_event(call(whereis(?MODULE), {chunk, Count})).
+%% @doc
+%% The chunk will contain Count logs at maximum.
+%% while ensuring that the whole chunk is less then MaxBytes.
+chunk(MaxCount, MaxBytes) ->
+    insert_drop_event(call(whereis(?MODULE), {chunk, MaxCount, MaxBytes})).
 
 %--- Logger Callbacks ----------------------------------------------------------
 
@@ -191,8 +194,8 @@ queue_ctrl_loop(S0) ->
                 S1 = sync(Seq, DroppedConfirmed, S0),
                 reply(From, ok),
                 S1;
-            {{chunk, Count}, From} ->
-                reply(From, peek(Count, S0)),
+            {{chunk, Count, Bytes}, From} ->
+                reply(From, peek(Count, Bytes, S0)),
                 S0
         end,
     ?MODULE:queue_ctrl_loop(S2).
@@ -208,8 +211,21 @@ sync(Seq, DroppedConfirmed, #{binlog := B0, dropped := Dropped} = State) ->
     B1 = grisp_io_binlog:truncate(Seq, B0),
     State#{binlog := B1, dropped := Dropped - DroppedConfirmed}.
 
-peek(Count, #{binlog := B0, dropped := Dropped}) ->
-    {grisp_io_binlog:peek(Count, B0), Dropped}.
+peek(Count, MaxBytes, #{binlog := B0, dropped := Dropped}) ->
+    Events = grisp_io_binlog:peek(Count, B0),
+    {trim_to_size(Events, MaxBytes), Dropped}.
+
+trim_to_size(Events, MaxBytes) ->
+    rec_trim_to_size(Events, MaxBytes, 0, []).
+
+rec_trim_to_size([], _, _, Acc) ->
+    lists:reverse(Acc);
+rec_trim_to_size([{_Seq, Bin} = E | TL], MaxBytes, AccSize, Acc) ->
+    NewSize = byte_size(Bin) + AccSize,
+    case NewSize > MaxBytes of
+        true -> lists:reverse(Acc);
+        false -> rec_trim_to_size(TL, MaxBytes, NewSize, [E | Acc])
+    end.
 
 insert_drop_event({Events, 0}) ->
     {Events, 0};
