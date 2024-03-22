@@ -52,6 +52,12 @@
 
 -define(DEFAULT_CALL_TIMEOUT, 5000).
 
+% FixMe:
+% Sending over ~30_000 bytes over WS breaks rtems I/O driver.
+% We want avoid to return chunks that are bigger then that.
+% -define(MAX_CHUNK_BYTES, 30_000).
+-define(MAX_LOG_BYTES, 30_000).
+
 %--- API -----------------------------------------------------------------------
 
 sync(Seq, DroppedConfirmed) when
@@ -87,7 +93,16 @@ format(Event, Config) ->
         _Else ->
             ok
     end,
-    base64:encode(term_to_binary(Event)).
+    Encoded = base64:encode(term_to_binary(Event)),
+    EncodedSize = byte_size(Encoded),
+    case EncodedSize > ?MAX_LOG_BYTES of
+        true ->
+            NewLog = log_discard(EncodedSize),
+            io:format("Replacing big log with ~p~n",[NewLog]),
+            base64:encode(term_to_binary(NewLog));
+        false ->
+            Encoded
+    end.
 
 %--- logger_h_common Callbacks -------------------------------------------------
 
@@ -201,9 +216,22 @@ insert_drop_event({Events, 0}) ->
 insert_drop_event({Events, Dropped}) ->
     {[drop_event(Dropped) | Events], Dropped}.
 
+log_discard(Size) ->
+    Meta = simulate_log_metadata(),
+    Report = {report, #{
+        event => log_discarded,
+        reason => too_long,
+        size => Size}
+    },
+    #{level => warning, meta => Meta, msg => Report}.
+
 drop_event(Count) ->
     % Create a fake logger event mimicking a real log event as much as possible
+    Meta = simulate_log_metadata(),
+    Report = {report, #{event => log_drop, count => Count}},
+    {null, format(#{level => warning, meta => Meta, msg => Report}, #{})}.
 
+simulate_log_metadata() ->
     % See internal function logger:add_default_metadata/2
     DefaultMetadata = #{
         pid => self(),
@@ -221,13 +249,10 @@ drop_event(Count) ->
             _ -> #{}
         end,
 
-    Meta = lists:foldl(
+    lists:foldl(
         fun(M, MAcc) ->
             maps:merge(MAcc, M)
         end,
         DefaultMetadata,
         [?LOCATION, PrimaryMetadata, ProcessMetadata]
-    ),
-
-    Report = {report, #{event => log_drop, count => Count}},
-    {null, format(#{level => warning, meta => Meta, msg => Report}, #{})}.
+    ).
