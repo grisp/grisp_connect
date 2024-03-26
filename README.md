@@ -41,30 +41,28 @@ Accepts an integer that represents the maximum number of logs that can be batche
 ## See all logs from boot on GRiSP.io
 
 Once this app is started, it forwards all logs to GRiSP.io without the need of setting up anything. The only logs that we do not catch are the ones generated before `grisp_io` boots.
-If you want to see ALL logs, even from applications that boot before `grisp_io`, you need to disable the default logger handler and set our handler as the default one. This involves changing the `kernel` and `grisp_io` app configuration settings in your sys.config file.
+If you want to see ALL logs, even from applications that boot before `grisp_io`, you need to disable the default logger handler and set the grisp_io handler as the default one. This involves changing the `kernel` and `grisp_io` app configuration settings in your sys.config file.
 
 You can copy paste these settings. Here we both swap the default logger handler with the grisp_io logger handler and also request it to print logs to stdout.
 ```erlang
 % sys.config
 [
     {kernel, [
-        {logger_level, debug},
         % Disable 'default' handler (which buffers all log events in logger).
         {logger, [{handler, default, undefined}]}
     ]},
     {grisp_io,[
         {logger, [
-            % Enable our own default handler,
-            % which will receive all events from boot
+            % Enable the grisp_io handler as default,
+            % so that it will receive all events from boot
             {handler,
              default, % name
              grisp_io_logger_bin, % module
              #{
                 formatter => {grisp_io_logger_bin, #{
-                    % If you want to see logs printed on the USB serial,
-                    % here you can appoint a logger formatter module of your choice
-                    % and set your preferred configuration to display OTP logs
-                    % setting: stdout => {Formatter, FormatterConfig}
+                    % To see logs printed on the USB serial appoint a logger
+                    % formatter module of your choice and set the stdout
+                    % configuration stdout => {Formatter, FormatterConfig}
                     stdout => {logger_formatter, #{}}
                 }}
              }
