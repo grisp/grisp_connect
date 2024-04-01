@@ -144,15 +144,17 @@ handle_event(state_timeout, retry, connecting, Data) ->
             ?LOG_NOTICE(#{event => connected}),
             {next_state, connected, Data};
         false ->
-            ?LOG_NOTICE(#{event => waiting_ws_connection}),
+            ?LOG_INFO(#{event => waiting_ws_connection}),
             {keep_state_and_data, [{state_timeout, ?STD_TIMEOUT, retry}]}
     end;
 
 % CONNECTED
 handle_event(enter, _OldState, connected, _Data) ->
+    grisp_io_log_server:start(),
     keep_state_and_data;
 handle_event(cast, disconnected, connected, Data) ->
     ?LOG_WARNING(#{event => disconnected}),
+    grisp_io_log_server:stop(),
     {next_state, waiting_ip, Data};
 
 handle_event(E, OldS, NewS, Data) ->
