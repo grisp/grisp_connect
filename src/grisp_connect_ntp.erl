@@ -1,4 +1,4 @@
--module(grisp_io_ntp).
+-module(grisp_connect_ntp).
 
 % API
 -export([start_link/0]).

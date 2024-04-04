@@ -1,17 +1,17 @@
-# grisp_io
+# grisp_connect
 
 GRiSP.io Client Library for GRiSP
 
 Add this application as a dependency in your GRiSP2 project.
 Your board will connect securely through Mutual TLS to the [GRiSP.io](https://grisp.io) services.
-See the [Board Registration](https://github.com/grisp/grisp_io/blob/main/Board_Registration.md) guide on how to start using your GRiSP2 board with GRiSP.io
+See the [Board Registration](https://github.com/grisp/grisp_connect/blob/main/Board_Registration.md) guide on how to start using your GRiSP2 board with GRiSP.io
 
 ## Application env options
 
 ### connect
 
 This option is set to `true` as default. Set it to `false` to prevent automatic connection to GRiSP.io on boot.
-In such case the state machine that maintains the connection can be started manually using `grisp_io_connection:connect()`.
+In such case the state machine that maintains the connection can be started manually using `grisp_connect_connection:connect()`.
 
 ### ntp
 
@@ -34,16 +34,16 @@ Accepts an integer that represents the maximum number of logs that can be batche
 
 ## API Usage example
 
-    ok = grisp_io:connect().
-    true = grisp_io:is_connected().
-    {ok, <<pong>>} = grisp_io:ping().
+    ok = grisp_connect:connect().
+    true = grisp_connect:is_connected().
+    {ok, <<pong>>} = grisp_connect:ping().
 
 ## See all logs from boot on GRiSP.io
 
-Once this app is started, it forwards all logs to GRiSP.io without the need of setting up anything. The only logs that we do not catch are the ones generated before `grisp_io` boots.
-If you want to see ALL logs, even from applications that boot before `grisp_io`, you need to disable the default logger handler and set the grisp_io handler as the default one. This involves changing the `kernel` and `grisp_io` app configuration settings in your sys.config file.
+Once this app is started, it forwards all logs to GRiSP.io without the need of setting up anything. The only logs that we do not catch are the ones generated before `grisp_connect` boots.
+If you want to see ALL logs, even from applications that boot before `grisp_connect`, you need to disable the default logger handler and set the grisp_connect handler as the default one. This involves changing the `kernel` and `grisp_connect` app configuration settings in your sys.config file.
 
-You can copy paste these settings. Here we both swap the default logger handler with the grisp_io logger handler and also request it to print logs to stdout.
+You can copy paste these settings. Here we both swap the default logger handler with the grisp_connect logger handler and also request it to print logs to stdout.
 ```erlang
 % sys.config
 [
@@ -51,15 +51,15 @@ You can copy paste these settings. Here we both swap the default logger handler 
         % Disable 'default' handler (which buffers all log events in logger).
         {logger, [{handler, default, undefined}]}
     ]},
-    {grisp_io,[
+    {grisp_connect,[
         {logger, [
-            % Enable the grisp_io handler as default,
+            % Enable the grisp_connect handler as default,
             % so that it will receive all events from boot
             {handler,
              default, % name
-             grisp_io_logger_bin, % module
+             grisp_connect_logger_bin, % module
              #{
-                formatter => {grisp_io_logger_bin, #{
+                formatter => {grisp_connect_logger_bin, #{
                     % To see logs printed on the USB serial appoint a logger
                     % formatter module of your choice and set the stdout
                     % configuration stdout => {Formatter, FormatterConfig}

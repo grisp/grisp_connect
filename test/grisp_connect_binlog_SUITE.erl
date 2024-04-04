@@ -1,4 +1,4 @@
--module(grisp_io_binlog_SUITE).
+-module(grisp_connect_binlog_SUITE).
 
 % -include_lib("common_test/include/ct.hrl").
 -include_lib("stdlib/include/assert.hrl").
@@ -6,7 +6,7 @@
 -compile(export_all).
 -compile(nowarn_export_all).
 
--import(grisp_io_binlog, [
+-import(grisp_connect_binlog, [
     defaults/1,
     new/0,
     new/1,

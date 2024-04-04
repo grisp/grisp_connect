@@ -1,5 +1,5 @@
 %% @doc Websocket client to connect to grisp.io
--module(grisp_io_ws).
+-module(grisp_connect_ws).
 
 -export([start_link/0]).
 -export([connect/0]).
@@ -32,8 +32,8 @@ start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 connect() ->
-    {ok, Domain} = application:get_env(grisp_io, domain),
-    {ok, Port} = application:get_env(grisp_io, port),
+    {ok, Domain} = application:get_env(grisp_connect, domain),
+    {ok, Port} = application:get_env(grisp_connect, port),
     connect(Domain, Port).
 
 connect(Server, Port) ->
@@ -53,7 +53,7 @@ handle_call(is_connected, _, #state{ws_up = Up} = S) ->
     {reply, Up, S}.
 
 handle_cast({connect, Server, Port}, #state{gun_pid = undefined} = S) ->
-    case grisp_io_tls:connect(Server, Port) of
+    case grisp_connect_tls:connect(Server, Port) of
         {ok, GunPid} ->
             {noreply, #state{gun_pid = GunPid}};
         Error ->
@@ -85,11 +85,11 @@ handle_info({gun_response, Pid, Stream, _, Status, _Headers},
     {noreply, shutdown_gun(S)};
 handle_info({gun_ws, Conn, Stream, {text, Text}},
             #state{gun_pid = Conn, ws_stream = Stream} = S) ->
-    grisp_io_client:handle_message(Text),
+    grisp_connect_client:handle_message(Text),
     {noreply, S};
 handle_info({gun_down, Pid, ws, closed, [Stream]}, #state{gun_pid = Pid, ws_stream = Stream} = S) ->
     ?LOG_WARNING(#{event => ws_closed}),
-    grisp_io_client:disconnected(),
+    grisp_connect_client:disconnected(),
     {noreply, shutdown_gun(S)};
 handle_info(M, S) ->
     ?LOG_WARNING(#{event => unhandled_info, info => M}),
