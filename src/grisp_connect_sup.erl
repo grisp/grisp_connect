@@ -1,9 +1,9 @@
 %%%-------------------------------------------------------------------
-%% @doc grisp_io top level supervisor.
+%% @doc grisp_connect top level supervisor.
 %% @end
 %%%-------------------------------------------------------------------
 
--module(grisp_io_sup).
+-module(grisp_connect_sup).
 
 -behaviour(supervisor).
 
@@ -34,19 +34,19 @@ init([]) ->
     SupFlags = #{
         strategy => one_for_all
     },
-    NTP = case application:get_env(grisp_io, ntp) of
-        {ok, true} -> [worker(grisp_io_ntp, [])];
+    NTP = case application:get_env(grisp_connect, ntp) of
+        {ok, true} -> [worker(grisp_connect_ntp, [])];
         {ok, false} -> []
     end,
 %% Notes:
-%% grisp_io_log_server is required to be running by grisp_io_client
-%% that starts and stops the logging loop in grisp_io_log_server asynchronous.
-%% Hence grisp_io_log_server should be started before grisp_io_client
-%% and a crash in grisp_io_log_server should crash grisp_io_client as well.
+%% grisp_connect_log_server is required to be running by grisp_connect_client
+%% that starts and stops the logging loop in grisp_connect_log_server asynchronous.
+%% Hence grisp_connect_log_server should be started before grisp_connect_client
+%% and a crash in grisp_connect_log_server should crash grisp_connect_client as well.
     ChildSpecs = NTP ++ [
-        worker(grisp_io_ws, []),
-        worker(grisp_io_log_server, []),
-        worker(grisp_io_client, [])
+        worker(grisp_connect_ws, []),
+        worker(grisp_connect_log_server, []),
+        worker(grisp_connect_client, [])
     ],
     {ok, {SupFlags, ChildSpecs}}.
 

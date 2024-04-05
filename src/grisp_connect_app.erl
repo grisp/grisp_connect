@@ -1,9 +1,9 @@
 %%%-------------------------------------------------------------------
-%% @doc grisp_io public API
+%% @doc grisp_connect public API
 %% @end
 %%%-------------------------------------------------------------------
 
--module(grisp_io_app).
+-module(grisp_connect_app).
 
 -behaviour(application).
 
@@ -17,8 +17,8 @@
 %--- Behaviour application Callback Functions ----------------------------------
 
 start(_StartType, _StartArgs) ->
-    logger:add_handlers(grisp_io),
-    grisp_io_sup:start_link().
+    logger:add_handlers(grisp_connect),
+    grisp_connect_sup:start_link().
 
 stop(_State) ->
     ok.

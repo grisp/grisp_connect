@@ -6,7 +6,7 @@
 %% If the buffer is filled, oldest logs are dropped
 %% and a fake logger event is inserted to inform the user.
 %% @end
--module(grisp_io_logger_bin).
+-module(grisp_connect_logger_bin).
 
 -include_lib("kernel/include/logger.hrl").
 
@@ -174,7 +174,7 @@ queue_ctrl_init(#{counters := Counters} = Config) ->
     register(?MODULE, self()),
     ?MODULE:queue_ctrl_loop(#{
         counters => Counters,
-        binlog => grisp_io_binlog:new(Config),
+        binlog => grisp_connect_binlog:new(Config),
         dropped => 0
     }).
 
@@ -203,15 +203,15 @@ reply({From, MRef}, Msg) -> From ! {MRef, Msg}.
 
 insert(Event, #{counters := Counters, binlog := B0, dropped := D0} = State) ->
     Seq = atomics:add_get(Counters, ?CNT_SEQ, 1),
-    {B1, D1} = grisp_io_binlog:insert({Seq, Event}, B0),
+    {B1, D1} = grisp_connect_binlog:insert({Seq, Event}, B0),
     State#{binlog := B1, dropped := D0 + D1}.
 
 sync(Seq, DroppedConfirmed, #{binlog := B0, dropped := Dropped} = State) ->
-    B1 = grisp_io_binlog:truncate(Seq, B0),
+    B1 = grisp_connect_binlog:truncate(Seq, B0),
     State#{binlog := B1, dropped := Dropped - DroppedConfirmed}.
 
 peek(Count, MaxBytes, #{binlog := B0, dropped := Dropped}) ->
-    Events = grisp_io_binlog:peek(Count, B0),
+    Events = grisp_connect_binlog:peek(Count, B0),
     {trim_to_size(Events, MaxBytes), Dropped}.
 
 trim_to_size(Events, MaxBytes) ->

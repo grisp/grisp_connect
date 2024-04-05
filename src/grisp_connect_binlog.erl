@@ -4,7 +4,7 @@
 %% It can be truncated once a batch of logs has been sent out
 %% and is not needed anymore.
 %% @end
--module(grisp_io_binlog).
+-module(grisp_connect_binlog).
 
 % API
 -export([defaults/1]).

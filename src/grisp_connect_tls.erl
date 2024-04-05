@@ -3,7 +3,7 @@
 %% @end
 %%%-------------------------------------------------------------------
 
--module(grisp_io_tls).
+-module(grisp_connect_tls).
 
 
 %--- Exports -------------------------------------------------------------------
@@ -30,8 +30,8 @@ connect(ServerName, Port) ->
 -ifdef(TEST).
 
 ssl_opts(_) ->
-    {ok, CertDir} = application:get_env(grisp_io, test_cert_dir),
-    Priv = code:priv_dir(grisp_io),
+    {ok, CertDir} = application:get_env(grisp_connect, test_cert_dir),
+    Priv = code:priv_dir(grisp_connect),
     {ok, [
         {verify, verify_none},
         {keyfile, filename:join(CertDir, "client.key")},
@@ -88,7 +88,7 @@ load_cert_chain(RelPath) ->
     end.
 
 cert_path(RelPath) ->
-    PrivDir = code:priv_dir(grisp_io),
+    PrivDir = code:priv_dir(grisp_connect),
     filename:join([PrivDir | RelPath]) ++ ".pem".
 
 decode_cert_chain(PemData) ->

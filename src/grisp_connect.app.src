@@ -1,8 +1,8 @@
-{application, grisp_io, [
+{application, grisp_connect, [
     {description, "GRiSP.io Client Library for GRiSP"},
     {vsn, "0.1.0"},
     {registered, []},
-    {mod, {grisp_io_app, []}},
+    {mod, {grisp_connect_app, []}},
     {applications, [
         kernel,
         inets,
@@ -28,9 +28,9 @@
           % Enable our own default handler,
           % which will receive all events from boot
           {handler,
-           grisp_io_log_handler,
-           grisp_io_logger_bin,
-           #{formatter => {grisp_io_logger_bin, #{}}}}
+           grisp_connect_log_handler,
+           grisp_connect_logger_bin,
+           #{formatter => {grisp_connect_logger_bin, #{}}}}
         ]}
     ]},
     {modules, []},

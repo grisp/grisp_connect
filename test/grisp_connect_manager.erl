@@ -1,4 +1,4 @@
--module(grisp_io_manager).
+-module(grisp_connect_manager).
 
 -compile([export_all, nowarn_export_all]).
 

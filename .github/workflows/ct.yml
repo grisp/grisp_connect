@@ -1,4 +1,4 @@
-name: grisp_io CT
+name: grisp_connect CT
 
 on:
   push:

@@ -1,8 +1,8 @@
 %% @doc gen_server that sends logs to GRiSP.io on a timed intervall.
 %%
-%% This process is controlled by grisp_io_client.
+%% This process is controlled by grisp_connect_client.
 %% @end
--module(grisp_io_log_server).
+-module(grisp_connect_log_server).
 
 % API
 -export([start_link/0]).
@@ -41,7 +41,7 @@ handle_call(_, _, _) ->
     error(?FUNCTION_NAME).
 
 handle_cast(start, #state{active = false, timer = undefined}) ->
-    {ok, Interval} = application:get_env(grisp_io, logs_interval),
+    {ok, Interval} = application:get_env(grisp_connect, logs_interval),
     {ok, Tref} = timer:send_interval(Interval, send_logs),
     {noreply, #state{active = true, timer = Tref}};
 handle_cast(stop, State) ->
@@ -49,8 +49,8 @@ handle_cast(stop, State) ->
     {noreply, #state{}}.
 
 handle_info(send_logs, #state{active = true} = State) ->
-    {ok, Size} = application:get_env(grisp_io, logs_batch_size),
-    case grisp_io_logger_bin:chunk(Size, ?MAX_CHUNK_BYTES) of
+    {ok, Size} = application:get_env(grisp_connect, logs_batch_size),
+    case grisp_connect_logger_bin:chunk(Size, ?MAX_CHUNK_BYTES) of
         {[], _Dropped} -> ok;
         Chunk -> send_logs_chunk(Chunk)
     end,
@@ -65,9 +65,9 @@ send_logs_chunk({Events, Dropped}) ->
         events => [[Seq, E] || {Seq, E} <- Events],
         dropped => Dropped
     },
-    case grisp_io_client:request(post, logs, LogUpdate) of
+    case grisp_connect_client:request(post, logs, LogUpdate) of
         {ok, #{seq := Seq, dropped := ServerDropped}} ->
-            grisp_io_logger_bin:sync(Seq, ServerDropped);
+            grisp_connect_logger_bin:sync(Seq, ServerDropped);
         E ->
             ?LOG_ERROR(#{event => send_logs, data => E})
     end.

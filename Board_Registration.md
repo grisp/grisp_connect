@@ -26,12 +26,12 @@ For a hassle-free experience:
 
 If you prefer a hands-on approach or need custom setup:
 
-1. **Project Setup:** Follow the [GRiSP Wiki](https://github.com/grisp/grisp/wiki) for instructions on creating and deploying your GRiSP2 application. Before proceeding, ensure `grisp_io` is added to your project's dependencies. Make sure `grisp_io` is started by adding it under `applications` section in your `myapp.app.src` file; this is a crucial step for manual linking.
+1. **Project Setup:** Follow the [GRiSP Wiki](https://github.com/grisp/grisp/wiki) for instructions on creating and deploying your GRiSP2 application. Before proceeding, ensure `grisp_connect` is added to your project's dependencies. Make sure `grisp_connect` is started by adding it under `applications` section in your `myapp.app.src` file; this is a crucial step for manual linking.
 
    - **Optional Configuration:** To streamline the process, include the device_linking_token in your project's release configuration (`config/sys.config`):
     ```erlang
     [
-        {grisp_io, [
+        {grisp_connect, [
             {device_linking_token, <<"your_token_here">>}
         ]}
     ].
@@ -41,27 +41,27 @@ If you prefer a hands-on approach or need custom setup:
 
 2. **Deploy Your Application:** After setting up, make sure your board is connected to the internet. You can verify that your board connected to GRiSP.io executing:
    ```erlang
-   > grisp_io:is_connected().
+   > grisp_connect:is_connected().
    true
    ```
 
 3. **Manually Link Your Board:** Access the Erlang shell on your board. To link, execute:
    ```erlang
-   > grisp_io:link_device(<<"your_unique_token">>).
+   > grisp_connect:link_device(<<"your_unique_token">>).
    ```
    Or, if your token is pre-configured in the environment, run:
    ```erlang
-   > grisp_io:link_device().
+   > grisp_connect:link_device().
    ```
 
 4. **Check Registration Status:** A successfull request returns `{ok, <<"ok">>}`. Confirm your device's registration on the [GRiSP Manager](https://grisp.io/grisp-manager/) page. Your device should appear under the **Devices** section. :tada:
 
 ### Troubleshooting:
-`grisp_io:link_device/*` may fail with the following errors.
+`grisp_connect:link_device/*` may fail with the following errors.
 #### **Common Errors:**
 - `token_expired`: regenerate one from the web page
 - `invalid_token`: please double check you typed it correctly
-- `token_undefined`: you called `grisp_io:link_device/0` without setting `device_linking_token`
+- `token_undefined`: you called `grisp_connect:link_device/0` without setting `device_linking_token`
 - `disconnected`: check that your board can connect
 - `device_already_linked`: please do not steal GRiSP boards :smirk:
   if you need to unlink a GRiSP board see below...
