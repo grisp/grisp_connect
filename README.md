@@ -11,7 +11,7 @@ See the [Board Registration](https://github.com/grisp/grisp_connect/blob/main/Bo
 ### connect
 
 This option is set to `true` as default. Set it to `false` to prevent automatic connection to GRiSP.io on boot.
-In such case the state machine that maintains the connection can be started manually using `grisp_connect_connection:connect()`.
+In such case the state machine that maintains the connection can be started manually using `grisp_connect_client:connect()`.
 
 ### ntp
 
