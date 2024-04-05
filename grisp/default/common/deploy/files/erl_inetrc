@@ -1,9 +1,9 @@
 %--- Erlang Inet Configuration -------------------------------------------------
 
 % Add hosts
-{host, {149,248,205,211}, ["grisp.io"]}.
-{host, {37, 16, 30, 91}, ["stage.grisp.io"]}.
-{host, {212,25,1,1},     ["0.europe.pool.ntp.org"]}.
+{host, {149,248,205,211}, ["devices.grisp.io"]}.
+{host, {37, 16, 30, 91},  ["devices.stage.grisp.io"]}.
+{host, {212,25,1,1},      ["0.europe.pool.ntp.org"]}.
 
 % Do not monitor the hosts file
 {hosts_file, ""}.
