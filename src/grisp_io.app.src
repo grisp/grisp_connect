@@ -17,7 +17,7 @@
         grisp_cryptoauth
     ]},
     {env, [
-        {domain, "grisp.io"},
+        {domain, "devices.grisp.io"},
         {port, 443},
         {connect, true}, % keeps a constant connection with grisp.io
         {ntp, false}, % if set to true, starts the NTP client
