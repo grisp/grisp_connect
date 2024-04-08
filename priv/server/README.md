@@ -1,7 +1,6 @@
 # Development Enviroment CA
 
-This information is for internal use, ignore this directory if you are not an official maintainer.
-
+This information is for internal use, ignore this directory if you are not a developer.
 
 ## Optional server chain
 
