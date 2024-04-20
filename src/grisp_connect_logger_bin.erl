@@ -96,15 +96,38 @@ format(Event, Config) ->
         _Else ->
             ok
     end,
-    Encoded = base64:encode(term_to_binary(Event)),
-    EncodedSize = byte_size(Encoded),
-    case EncodedSize > ?MAX_LOG_BYTES of
+    jsonify_meta(jsonify_msg(Event)).
+
+jsonify_msg(#{msg := {string, String}} = Event) ->
+    maps:put(msg, String, Event);
+jsonify_msg(#{msg := {report, Report}} = Event) ->
+    case jsx:is_term(Report) of
         true ->
-            NewLog = log_discard(EncodedSize),
-            base64:encode(term_to_binary(NewLog));
+            maps:put(msg, Report, Event);
         false ->
-            Encoded
-    end.
+            String = io_lib:format("[JSON incompatible term] ~p", [Report]),
+            maps:put(msg, String, Event)
+    end;
+jsonify_msg(#{msg := {FormatString, Term}} = Event) ->
+    String = io_lib:format(FormatString, Term),
+    maps:put(msg, String, Event).
+
+jsonify_meta(#{meta := Meta} = Event) ->
+    MFA = case maps:is_key(mfa, Meta) of
+              true ->
+                  {M, F, A} = maps:get(mfa, Meta),
+                  [M, F, A];
+              false ->
+                  null
+          end,
+    File = case maps:is_key(file, Meta) of
+               true  -> unicode:characters_to_binary(maps:get(file, Meta));
+               false -> null
+           end,
+    Default = #{mfa => MFA, file => File},
+    Optional = maps:without(maps:keys(Default), Meta),
+    FilterFun = fun(Key, Value) -> jsx:is_term(#{Key => Value}) end,
+    maps:put(meta, maps:merge(maps:filter(FilterFun, Optional), Default), Event).
 
 %--- logger_h_common Callbacks -------------------------------------------------
 
@@ -230,15 +253,6 @@ insert_drop_event({Events, 0}) ->
     {Events, 0};
 insert_drop_event({Events, Dropped}) ->
     {[drop_event(Dropped) | Events], Dropped}.
-
-log_discard(Size) ->
-    Meta = simulate_log_metadata(),
-    Report = {report, #{
-        event => log_discarded,
-        reason => too_long,
-        size => Size}
-    },
-    #{level => warning, meta => Meta, msg => Report}.
 
 drop_event(Count) ->
     % Create a fake logger event mimicking a real log event as much as possible
