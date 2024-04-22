@@ -62,7 +62,7 @@ handle_info(send_logs, #state{active = false, timer = undefined} = State) ->
 
 send_logs_chunk({Events, Dropped}) ->
     LogUpdate = #{
-        events => [[Seq, E] || {Seq, E} <- Events],
+        events => [[Seq, jsonify(E)] || {Seq, E} <- Events],
         dropped => Dropped
     },
     case grisp_connect_client:request(post, logs, LogUpdate) of
@@ -71,3 +71,39 @@ send_logs_chunk({Events, Dropped}) ->
         E ->
             ?LOG_ERROR(#{event => send_logs, data => E})
     end.
+
+jsonify(Event) ->
+    jsonify_meta(jsonify_msg(binary_to_term(base64:decode(Event)))).
+
+jsonify_msg(#{msg := {string, String}} = Event) ->
+    maps:put(msg, iolist_to_binary(String), Event);
+jsonify_msg(#{msg := {report, Report}} = Event) ->
+    case jsx:is_term(Report) of
+        true ->
+            maps:put(msg, Report, Event);
+        false ->
+            String = list_to_binary(
+                       io_lib:format("[JSON incompatible term]~n~p", [Report])
+                      ),
+            maps:put(msg, String, Event)
+    end;
+jsonify_msg(#{msg := {FormatString, Term}} = Event) ->
+    String = list_to_binary(io_lib:format(FormatString, Term)),
+    maps:put(msg, String, Event).
+
+jsonify_meta(#{meta := Meta} = Event) ->
+    MFA = case maps:is_key(mfa, Meta) of
+              true ->
+                  {M, F, A} = maps:get(mfa, Meta),
+                  [M, F, A];
+              false ->
+                  null
+          end,
+    File = case maps:is_key(file, Meta) of
+               true  -> unicode:characters_to_binary(maps:get(file, Meta));
+               false -> null
+           end,
+    Default = #{mfa => MFA, file => File},
+    Optional = maps:without(maps:keys(Default), Meta),
+    FilterFun = fun(Key, Value) -> jsx:is_term(#{Key => Value}) end,
+    maps:put(meta, maps:merge(maps:filter(FilterFun, Optional), Default), Event).
