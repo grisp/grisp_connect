@@ -30,16 +30,20 @@ init_per_suite(Config) ->
 end_per_suite(Config) ->
     grisp_connect_manager:cleanup_apps(?config(apps, Config)).
 
-init_per_testcase(_, Config) ->
+init_per_testcase(TestCase, Config) ->
     {ok, _} = application:ensure_all_started(grisp_emulation),
     application:set_env(grisp_connect, test_cert_dir, ?config(cert_dir, Config)),
     {ok, _} = application:ensure_all_started(grisp_connect),
+    case TestCase of
+        auto_connect_test -> ok;
+        _ -> ok = wait_connection(20)
+    end,
     Config.
 
 end_per_testcase(_, Config) ->
     ok = application:stop(grisp_connect),
     mnesia:activity(transaction, fun() ->
-        mnesia:delete({grisp_device, <<"0000">>})
+        mnesia:delete({grisp_device, serial_number()})
     end),
     flush(),
     Config.
@@ -50,11 +54,9 @@ auto_connect_test(_) ->
     ?assertMatch(ok, wait_connection(20)).
 
 ping_test(_) ->
-    ?assertMatch(ok, wait_connection(20)),
     ?assertMatch({ok, <<"pang">>}, grisp_connect:ping()).
 
 link_device_test(_) ->
-    ?assertMatch(ok, wait_connection(20)),
     ?assertMatch({error, token_undefined}, grisp_connect:link_device()),
     application:set_env(grisp_connect, device_linking_token, <<"token">>),
     ?assertMatch({error, invalid_token}, grisp_connect:link_device()),
@@ -64,6 +66,8 @@ link_device_test(_) ->
     ?assertMatch({ok, <<"pong">>}, grisp_connect:ping()).
 
 %--- Internal ------------------------------------------------------------------
+
+serial_number() -> <<"0000">>.
 
 wait_connection(0) ->
     {error, timeout};
