@@ -76,19 +76,20 @@ jsonify(Event) ->
     jsonify_meta(jsonify_msg(binary_to_term(base64:decode(Event)))).
 
 jsonify_msg(#{msg := {string, String}} = Event) ->
-    maps:put(msg, iolist_to_binary(String), Event);
+    maps:put(msg, unicode:characters_to_binary(String), Event);
 jsonify_msg(#{msg := {report, Report}} = Event) ->
     case jsx:is_term(Report) of
         true ->
             maps:put(msg, Report, Event);
         false ->
-            String = list_to_binary(
-                       io_lib:format("[JSON incompatible term]~n~p", [Report])
+            String = unicode:characters_to_binary(
+                       io_lib:format("[JSON incompatible term]~n~tp", [Report])
                       ),
             maps:put(msg, String, Event)
     end;
 jsonify_msg(#{msg := {FormatString, Term}} = Event) ->
-    String = list_to_binary(io_lib:format(FormatString, Term)),
+    %FIXME: scan format and ensure unicode encoding
+    String = io_lib:format(FormatString, Term),
     maps:put(msg, String, Event).
 
 jsonify_meta(#{meta := Meta} = Event) ->
