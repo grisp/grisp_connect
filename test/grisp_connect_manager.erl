@@ -45,6 +45,9 @@ cleanup_apps(Apps) ->
     [application:stop(App) || App <- Apps],
     application:stop(mnesia).
 
+link_device() ->
+    grisp_manager:link_device(<<"0000">>, <<"Uuid">>).
+
 register_user() ->
     Hash = erlpass:hash(<<"1234">>),
     WriteUser = fun() ->

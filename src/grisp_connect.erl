@@ -13,6 +13,7 @@
 -export([ping/0]).
 -export([link_device/0]).
 -export([link_device/1]).
+-export([log/2]).
 
 %--- API Functions -------------------------------------------------------------
 
@@ -47,3 +48,6 @@ link_device() ->
     {ok, binary()} | {error, invalid_token}.
 link_device(Token) ->
     grisp_connect_client:request(post, device_linking_token, #{token => Token}).
+
+% @doc Log from inside grisp_connect for testing.
+log(Level, Args) -> apply(logger, Level, Args).
