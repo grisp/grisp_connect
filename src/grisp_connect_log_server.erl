@@ -89,7 +89,7 @@ jsonify_msg(#{msg := {report, Report}} = Event) ->
     end;
 jsonify_msg(#{msg := {FormatString, Term}} = Event) ->
     %FIXME: scan format and ensure unicode encoding
-    String = io_lib:format(FormatString, Term),
+    String = unicode:characters_to_binary(io_lib:format(FormatString, Term)),
     maps:put(msg, String, Event).
 
 jsonify_meta(#{meta := Meta} = Event) ->
