@@ -40,29 +40,24 @@ init_per_testcase(log_level_test, Config) ->
     logger:set_primary_config(level, debug),
     init_per_testcase(other, [{default_level, Level} | Config]);
 init_per_testcase(_, Config) ->
-    {ok, Apps1} = application:ensure_all_started(grisp_emulation),
+    {ok, _} = application:ensure_all_started(grisp_emulation),
     application:set_env(grisp_connect, test_cert_dir, ?config(cert_dir, Config)),
-    {ok, Apps2} = application:ensure_all_started(grisp_connect),
-    ?assertEqual(ok, wait_connection()),
-    [{apps, Apps1 ++ Apps2} | Config].
+    {ok, _} = application:ensure_all_started(grisp_connect),
+    ok = wait_connection(),
+    ct:sleep(1000),
+    send_logs(),
+    ct:sleep(1000),
+    Config.
 
 end_per_testcase(log_level_test, Config) ->
     logger:set_primary_config(level, ?config(default_level, Config)),
     end_per_testcase(other, Config);
 end_per_testcase(_, Config) ->
-    mnesia:activity(transaction, fun() ->
-        mnesia:delete({grisp_device, serial_number()})
-    end),
-    [ok = application:stop(App) || App <- ?config(apps, Config)],
-    flush(),
     Config.
 
 %--- Tests ---------------------------------------------------------------------
 
 string_logs_test(_) ->
-    LogServer = whereis(grisp_connect_log_server),
-    LogServer ! send_logs,
-    ct:sleep(100),
     LastSeq = last_seq(),
     S1 = "@#$%^&*()_ +{}|:\"<>?-[];'./,\\`~!\néäüßóçøáîùêñÄÖÜÉÁÍÓÚàèìòùÂÊÎÔÛ€",
     S2 = <<"@#$%^&*()_ +{}|:\"<>?-[];'./,\\`~!\néäüßóçøáîùêñÄÖÜÉÁÍÓÚàèìòùÂÊÎÔÛ€"/utf8>>,
@@ -71,16 +66,13 @@ string_logs_test(_) ->
     Seqs = [LastSeq + 1, LastSeq + 2],
     Fun = fun({Seq, String, Text}) ->
                   grisp_connect:log(error, [String]),
-                  LogServer ! send_logs,
+                  send_logs(),
                   ct:sleep(100),
                   check_log(Seq, error, Text)
           end,
     lists:map(Fun, lists:zip3(Seqs, Strings, Texts)).
 
 formatted_logs_test(_) ->
-    LogServer = whereis(grisp_connect_log_server),
-    LogServer ! send_logs,
-    ct:sleep(100),
     ArgsList = [["~c, ~tc", [$ä, $€]],
                 ["~p, ~tp", ['tést', 'tést']],
                 ["~p, ~tp", [<<"tést">>, <<"tést"/utf8>>]],
@@ -95,16 +87,13 @@ formatted_logs_test(_) ->
     Seqs = lists:seq(LastSeq + 1, LastSeq + length(ArgsList)),
     Fun = fun({Seq, Args, Text}) ->
                   grisp_connect:log(error, Args),
-                  LogServer ! send_logs,
+                  send_logs(),
                   ct:sleep(100),
                   check_log(Seq, error, Text)
           end,
     lists:map(Fun, lists:zip3(Seqs, ArgsList, Texts)).
 
 structured_logs_test(_) ->
-    LogServer = whereis(grisp_connect_log_server),
-    LogServer ! send_logs,
-    ct:sleep(100),
     Events = [#{event => <<"tést"/utf8>>},
               #{event => "tést"},
               #{event => 'tést'},
@@ -127,16 +116,13 @@ structured_logs_test(_) ->
     Seqs = lists:seq(LastSeq + 1, LastSeq + length(Events)),
     Fun = fun({Seq, Event, Text}) ->
                   grisp_connect:log(error, [Event]),
-                  LogServer ! send_logs,
+                  send_logs(),
                   ct:sleep(100),
                   check_log(Seq, error, Text)
           end,
     lists:map(Fun, lists:zip3(Seqs, Events, Texts)).
 
 log_level_test(_) ->
-    LogServer = whereis(grisp_connect_log_server),
-    LogServer ! send_logs,
-    ct:sleep(100),
     Levels = [emergency,
               alert,
               critical,
@@ -149,7 +135,7 @@ log_level_test(_) ->
     Seqs = lists:seq(LastSeq + 1, LastSeq + length(Levels)),
     Fun = fun({Seq, Level}) ->
                   grisp_connect:log(Level, ["level test"]),
-                  LogServer ! send_logs,
+                  send_logs(),
                   ct:sleep(100),
                   check_log(Seq, Level, <<"level test\n"/utf8>>)
           end,
@@ -159,15 +145,12 @@ log_level_test(_) ->
     % One needs to be able to control the traffic
     logger:set_primary_config(level, notice),
     grisp_connect:log(info, ["level test"]),
-    LogServer ! send_logs,
+    send_logs(),
     ct:sleep(100),
     Logs = grisp_manager_device_logs:fetch(serial_number(), last_seq()),
     ?assertEqual([], Logs).
 
 meta_data_test(_) ->
-    LogServer = whereis(grisp_connect_log_server),
-    LogServer ! send_logs,
-    ct:sleep(100),
     Meta = #{custom1 => <<"binäry"/utf8>>,
              custom2 => ['é1', <<"é2"/utf8>>],
              custom3 => 'åtom',
@@ -199,11 +182,15 @@ meta_data_test(_) ->
     LastSeq = last_seq(),
     Seq = LastSeq + 1,
     grisp_connect:log(error, ["Test meta", Meta]),
-    LogServer ! send_logs,
+    send_logs(),
     ct:sleep(100),
     check_log(Seq, error, Text).
 
 %--- Internal ------------------------------------------------------------------
+
+send_logs() ->
+    LogServer = whereis(grisp_connect_log_server),
+    LogServer ! send_logs.
 
 last_seq() ->
     {Seq, _} = case grisp_manager_device_logs:fetch(serial_number(), -1) of
@@ -231,8 +218,3 @@ log_header(warning)   -> <<"=WARNING REPORT===">>;
 log_header(notice)    -> <<"=NOTICE REPORT===">>;
 log_header(info)      -> <<"=INFO REPORT===">>;
 log_header(debug)     -> <<"=DEBUG REPORT===">>.
-
-flush() ->
-    receive Any -> ct:pal("Flushed: ~p", [Any]), flush()
-    after 0 -> ok
-    end.

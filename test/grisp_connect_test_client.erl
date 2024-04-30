@@ -17,6 +17,7 @@ wait_connection() ->
     wait_connection(20).
 
 wait_connection(0) ->
+    ct:pal("grisp_connect state:~n~p~n", [sys:get_state(grisp_connect_client)]),
     {error, timeout};
 wait_connection(N) ->
     case grisp_connect:is_connected() of
