@@ -6,6 +6,10 @@
 
 -compile([export_all, nowarn_export_all]).
 
+-import(grisp_connect_test_client, [wait_connection/0]).
+-import(grisp_connect_test_client, [serial_number/0]).
+-import(grisp_connect_test_client, [cert_dir/0]).
+
 %--- API -----------------------------------------------------------------------
 
 all() ->
@@ -18,7 +22,7 @@ all() ->
 
 init_per_suite(Config) ->
     PrivDir = ?config(priv_dir, Config),
-    CertDir =  filename:join(?config(data_dir, Config), "certs"),
+    CertDir = cert_dir(),
 
     PolicyFile = filename:join(PrivDir, "policies.term"),
     ?assertEqual(ok, file:write_file(PolicyFile, <<>>)),
@@ -30,16 +34,20 @@ init_per_suite(Config) ->
 end_per_suite(Config) ->
     grisp_connect_manager:cleanup_apps(?config(apps, Config)).
 
-init_per_testcase(_, Config) ->
+init_per_testcase(TestCase, Config) ->
     {ok, _} = application:ensure_all_started(grisp_emulation),
     application:set_env(grisp_connect, test_cert_dir, ?config(cert_dir, Config)),
     {ok, _} = application:ensure_all_started(grisp_connect),
+    case TestCase of
+        auto_connect_test -> ok;
+        _ -> ok = wait_connection()
+    end,
     Config.
 
 end_per_testcase(_, Config) ->
     ok = application:stop(grisp_connect),
     mnesia:activity(transaction, fun() ->
-        mnesia:delete({grisp_device, <<"0000">>})
+        mnesia:delete({grisp_device, serial_number()})
     end),
     flush(),
     Config.
@@ -47,14 +55,12 @@ end_per_testcase(_, Config) ->
 %--- Tests ---------------------------------------------------------------------
 
 auto_connect_test(_) ->
-    ?assertMatch(ok, wait_connection(20)).
+    ?assertMatch(ok, wait_connection()).
 
 ping_test(_) ->
-    ?assertMatch(ok, wait_connection(20)),
     ?assertMatch({ok, <<"pang">>}, grisp_connect:ping()).
 
 link_device_test(_) ->
-    ?assertMatch(ok, wait_connection(20)),
     ?assertMatch({error, token_undefined}, grisp_connect:link_device()),
     application:set_env(grisp_connect, device_linking_token, <<"token">>),
     ?assertMatch({error, invalid_token}, grisp_connect:link_device()),
@@ -64,16 +70,6 @@ link_device_test(_) ->
     ?assertMatch({ok, <<"pong">>}, grisp_connect:ping()).
 
 %--- Internal ------------------------------------------------------------------
-
-wait_connection(0) ->
-    {error, timeout};
-wait_connection(N) ->
-    case grisp_connect:is_connected() of
-       true -> ok;
-       false ->
-           ct:sleep(100),
-           wait_connection(N - 1)
-    end.
 
 flush() ->
     receive Any -> ct:pal("Flushed: ~p", [Any]), flush()

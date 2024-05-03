@@ -45,10 +45,14 @@ cleanup_apps(Apps) ->
     [application:stop(App) || App <- Apps],
     application:stop(mnesia).
 
+link_device() ->
+    grisp_manager:link_device(<<"0000">>, <<"Uuid">>).
+
 register_user() ->
     Hash = erlpass:hash(<<"1234">>),
     WriteUser = fun() ->
                         mnesia:write({eresu_user,
+                                      <<"Uuid">>,
                                       <<"Testuser">>,
                                       <<"foo">>,
                                       <<"a@a.a">>,
@@ -58,6 +62,6 @@ register_user() ->
                                       undefined,
                                       undefined,
                                       <<"customer_id">>,
-                                      [<<"subscription_id">>]})
+                                      []})
                 end,
     mnesia:activity(transaction, WriteUser).

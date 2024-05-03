@@ -5,6 +5,8 @@
 
 -module(grisp_connect).
 
+-include_lib("kernel/include/logger.hrl").
+
 %--- Exports -------------------------------------------------------------------
 
 % API functions
@@ -13,6 +15,8 @@
 -export([ping/0]).
 -export([link_device/0]).
 -export([link_device/1]).
+-export([log/2]).
+-export([test_log_encoding/0]).
 
 %--- API Functions -------------------------------------------------------------
 
@@ -47,3 +51,16 @@ link_device() ->
     {ok, binary()} | {error, invalid_token}.
 link_device(Token) ->
     grisp_connect_client:request(post, device_linking_token, #{token => Token}).
+
+% @doc Log from inside grisp_connect for testing.
+log(Level, Args) -> apply(logger, Level, Args).
+
+% @doc For manually testing the log encoding.
+% Alternative to shell commands. The shell double encodes unicode strings.
+test_log_encoding() ->
+    String = "@#$%^&*()_ +{}|:\"<>?-[];'./,\\`~!\néäüßóçøáîùêñÄÖÜÉÁÍÓÚàèìòùÂÊÎÔÛ",
+    Binary = <<"@#$%^&*()_ +{}|:\"<>?-[];'./,\\`~!\néäüßóçøáîùêñÄÖÜÉÁÍÓÚàèìòùÂÊÎÔÛ"/utf8>>,
+    ?LOG_NOTICE("List:\n" ++ String),
+    ?LOG_NOTICE(<<"Binary: \n", Binary/binary>>),
+    ?LOG_NOTICE("List:~n~tp~nBinary:~n~tp~n", [String, Binary]),
+    ?LOG_NOTICE(#{list => String, binary => Binary}).
