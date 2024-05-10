@@ -8,4 +8,17 @@ and this project adheres to
 
 ## [Unreleased]
 
-[Unreleased]: https://github.com/grisp/grisp/compare/6b59d16383b3e5154ef839bcf5c77a6b770aada5...HEAD
+## [1.0.0] - 2024-05-10
+
+### What's Changed
+
+#### Added
+* NTP handling
+* Connect to GRiSP.io
+* Device Linking to User Account in GRiSP.io
+* Logging towards GRiSP.io
+
+**Full Changelog**: https://github.com/grisp/grisp_connect/commits/1.0.0
+
+[Unreleased]: https://github.com/grisp/grisp_connect/compare/1.0.0...HEAD
+[1.0.0]: https://github.com/grisp/grisp_connect/release/tag/1.0.0
