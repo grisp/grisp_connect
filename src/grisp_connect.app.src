@@ -1,6 +1,6 @@
 {application, grisp_connect, [
     {description, "GRiSP.io Client Library for GRiSP"},
-    {vsn, "0.1.0"},
+    {vsn, semver},
     {registered, []},
     {mod, {grisp_connect_app, []}},
     {applications, [
