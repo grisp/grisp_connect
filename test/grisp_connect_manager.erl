@@ -18,6 +18,12 @@ start(CertDir, Config) ->
     application:start(mnesia),
 
     {ok, Started2} = application:ensure_all_started(kraft),
+    KraftRef = kraft_start(CertDir),
+
+    {ok, Started3} = application:ensure_all_started(grisp_manager),
+    [{apps, Started1 ++ Started2 ++ Started3}, {kraft_instance , KraftRef} | Config].
+
+kraft_start(CertDir) ->
     SslOpts = [
         {verify, verify_peer},
         {keyfile, filename:join(CertDir, "server.key")},
@@ -33,10 +39,7 @@ start(CertDir, Config) ->
         {"/grisp-connect/ws",
             {ws, grisp_manager_device_api}, #{}, #{type => json_rpc}}
     ],
-    kraft:start(KraftOpts, KraftRoutes),
-
-    {ok, Started3} = application:ensure_all_started(grisp_manager),
-    [{apps, Started1 ++ Started2 ++ Started3} | Config].
+    kraft:start(KraftOpts, KraftRoutes).
 
 cleanup_apps(Apps) ->
     mnesia:delete_table(eresu_user),

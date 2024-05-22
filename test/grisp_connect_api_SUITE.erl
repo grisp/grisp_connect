@@ -7,6 +7,8 @@
 -compile([export_all, nowarn_export_all]).
 
 -import(grisp_connect_test_client, [wait_connection/0]).
+-import(grisp_connect_test_client, [wait_connection/1]).
+-import(grisp_connect_test_client, [wait_disconnection/0]).
 -import(grisp_connect_test_client, [serial_number/0]).
 -import(grisp_connect_test_client, [cert_dir/0]).
 
@@ -68,6 +70,20 @@ link_device_test(_) ->
     application:set_env(grisp_connect, device_linking_token, Token),
     ?assertMatch({ok, <<"ok">>}, grisp_connect:link_device()),
     ?assertMatch({ok, <<"pong">>}, grisp_connect:ping()).
+
+reconnect_on_gun_crash_test(_) ->
+    {state, GunPid, _, _, _} = sys:get_state(grisp_connect_ws),
+    proc_lib:stop(GunPid),
+    ?assertMatch(ok, wait_disconnection()),
+    ?assertMatch(ok, wait_connection()).
+
+reconnect_on_disconnection_test(Config) ->
+    KraftRef = ?config(kraft_instance, Config),
+    kraft:stop(KraftRef),
+    ?assertMatch(ok, wait_disconnection()),
+    KraftRef2 = grisp_connect_manager:kraft_start(cert_dir()),
+    ?assertMatch(ok, wait_connection(100)),
+    [{kraft_instance, KraftRef2} | proplists:delete(kraft_instance, Config)].
 
 %--- Internal ------------------------------------------------------------------
 

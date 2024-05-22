@@ -91,12 +91,17 @@ handle_info({gun_down, Pid, ws, closed, [Stream]}, #state{gun_pid = Pid, ws_stre
     ?LOG_WARNING(#{event => ws_closed}),
     grisp_connect_client:disconnected(),
     {noreply, shutdown_gun(S)};
+handle_info({'DOWN', _, process, Pid, Reason}, #state{gun_pid = Pid} = S) ->
+    ?LOG_WARNING(#{event => gun_crash, reason => Reason}),
+    grisp_connect_client:disconnected(),
+    {noreply, S?disconnected_state};
 handle_info(M, S) ->
-    ?LOG_WARNING(#{event => unhandled_info, info => M}),
+    ?LOG_WARNING(#{event => unhandled_info, info => M, state => S}),
     {noreply, S}.
 
 % internal functions -----------------------------------------------------------
 
-shutdown_gun(#state{gun_pid = Pid} = State) ->
+shutdown_gun(#state{gun_pid = Pid, gun_ref = GunRef} = State) ->
+    demonitor(GunRef),
     gun:shutdown(Pid),
     State?disconnected_state.
