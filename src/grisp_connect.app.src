@@ -22,6 +22,7 @@
         {connect, true}, % keeps a constant connection with grisp.io
         {ntp, false}, % if set to true, starts the NTP client
         {ws_requests_timeout, 5_000},
+        {ws_ping_timeout, 60_000},
         {logs_interval, 2_000},
         {logs_batch_size, 100},
         {logger, [

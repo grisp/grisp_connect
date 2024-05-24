@@ -18,7 +18,8 @@
     gun_pid,
     gun_ref,
     ws_stream,
-    ws_up = false
+    ws_up = false,
+    ping_timer
 }).
 
 -define(disconnected_state,
@@ -72,19 +73,29 @@ handle_cast({send, Payload},  #state{gun_pid = Pid, ws_stream = Stream} = S) ->
 handle_info({gun_up, GunPid, _}, #state{gun_pid = GunPid} = S) ->
     ?LOG_INFO(#{event => connection_enstablished}),
     GunRef = monitor(process, GunPid),
-    WsStream = gun:ws_upgrade(GunPid, "/grisp-connect/ws"),
+    WsStream = gun:ws_upgrade(GunPid, "/grisp-connect/ws",[],
+                              #{silence_pings => false}),
     NewState = S#state{gun_pid = GunPid, gun_ref = GunRef, ws_stream = WsStream},
     {noreply, NewState};
+handle_info({gun_up, _OldPid, http}, #state{gun_pid = _GunPid} = S) ->
+    % Ignoring outdated gun_up messages
+    {noreply, S};
 handle_info({gun_upgrade, Pid, Stream, [<<"websocket">>], _},
             #state{gun_pid = Pid, ws_stream = Stream} = S) ->
     ?LOG_INFO(#{event => ws_upgrade}),
-    {noreply, S#state{ws_up = true}};
+    PingTimer = start_ping_timer(),
+    {noreply, S#state{ws_up = true, ping_timer = PingTimer}};
 handle_info({gun_response, Pid, Stream, _, Status, _Headers},
             #state{gun_pid = Pid, ws_stream = Stream} = S) ->
     ?LOG_ERROR(#{event => ws_upgrade_failure, status => Status}),
     {noreply, shutdown_gun(S)};
-handle_info({gun_ws, Conn, Stream, {text, Text}},
-            #state{gun_pid = Conn, ws_stream = Stream} = S) ->
+handle_info({gun_ws, Pid, Stream, ping},
+            #state{gun_pid = Pid, ws_stream = Stream,
+                   ping_timer = PingTimer} = S) ->
+    timer:cancel(PingTimer),
+    {noreply, S#state{ping_timer = undefined}};
+handle_info({gun_ws, Pid, Stream, {text, Text}},
+            #state{gun_pid = Pid, ws_stream = Stream} = S) ->
     grisp_connect_client:handle_message(Text),
     {noreply, S};
 handle_info({gun_down, Pid, ws, closed, [Stream]}, #state{gun_pid = Pid, ws_stream = Stream} = S) ->
@@ -93,6 +104,10 @@ handle_info({gun_down, Pid, ws, closed, [Stream]}, #state{gun_pid = Pid, ws_stre
     {noreply, shutdown_gun(S)};
 handle_info({'DOWN', _, process, Pid, Reason}, #state{gun_pid = Pid} = S) ->
     ?LOG_WARNING(#{event => gun_crash, reason => Reason}),
+    grisp_connect_client:disconnected(),
+    {noreply, S?disconnected_state};
+handle_info(ping_timeout, S) ->
+    ?LOG_WARNING(#{event => ping_timeout}),
     grisp_connect_client:disconnected(),
     {noreply, S?disconnected_state};
 handle_info(M, S) ->
@@ -105,3 +120,8 @@ shutdown_gun(#state{gun_pid = Pid, gun_ref = GunRef} = State) ->
     demonitor(GunRef),
     gun:shutdown(Pid),
     State?disconnected_state.
+
+start_ping_timer() ->
+    {ok, Timeout} = application:get_env(grisp_connect, ws_ping_timeout),
+    {ok, Tref} = timer:send_after(Timeout, ping_timeout),
+    Tref.
