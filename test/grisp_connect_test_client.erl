@@ -8,6 +8,7 @@
 -export([wait_connection/0]).
 -export([wait_connection/1]).
 -export([wait_disconnection/0]).
+-export([wait_disconnection/1]).
 
 %--- API -----------------------------------------------------------------------
 
