@@ -23,7 +23,8 @@
 }).
 
 -define(disconnected_state,
-        #state{gun_pid = undefined, gun_ref = undefine, ws_up = false}).
+        #state{gun_pid = undefined, gun_ref = undefine,
+               ws_up = false, ping_timer = undefined}).
 
 -include_lib("kernel/include/logger.hrl").
 
@@ -118,7 +119,7 @@ handle_info(M, S) ->
 % internal functions -----------------------------------------------------------
 
 shutdown_gun(#state{gun_pid = Pid, gun_ref = GunRef,
-             ping_timer = PingTimer} = State) ->
+                    ping_timer = PingTimer} = State) ->
     timer:cancel(PingTimer),
     demonitor(GunRef),
     gun:shutdown(Pid),

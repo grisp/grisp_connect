@@ -72,7 +72,7 @@ link_device_test(_) ->
     ?assertMatch({ok, <<"pong">>}, grisp_connect:ping()).
 
 reconnect_on_gun_crash_test(_) ->
-    {state, GunPid, _, _, _} = sys:get_state(grisp_connect_ws),
+    {state, GunPid, _, _, _, _} = sys:get_state(grisp_connect_ws),
     proc_lib:stop(GunPid),
     ?assertMatch(ok, wait_disconnection()),
     ?assertMatch(ok, wait_connection()).
