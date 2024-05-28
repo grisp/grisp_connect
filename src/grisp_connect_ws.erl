@@ -78,8 +78,9 @@ handle_info({gun_up, GunPid, _}, #state{gun_pid = GunPid} = S) ->
                               #{silence_pings => false}),
     NewState = S#state{gun_pid = GunPid, gun_ref = GunRef, ws_stream = WsStream},
     {noreply, NewState};
-handle_info({gun_up, _OldPid, http}, #state{gun_pid = _GunPid} = S) ->
-    % Ignoring outdated gun_up messages
+handle_info({gun_up, Pid, http}, #state{gun_pid = GunPid} = S) ->
+    ?LOG_WARNING("Ignoring unexpected gun_up http message"
+                 " from pid ~p, current pid is ~p", [Pid, GunPid]),
     {noreply, S};
 handle_info({gun_upgrade, Pid, Stream, [<<"websocket">>], _},
             #state{gun_pid = Pid, ws_stream = Stream} = S) ->

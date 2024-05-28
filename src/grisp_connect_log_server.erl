@@ -111,6 +111,6 @@ jsonify_meta(#{meta := Meta} = Event) ->
 
 is_json_compatible(Term) ->
     try jsx:is_term(Term)
-    catch error:_:_ ->
+    catch error:_ ->
         false
     end.
