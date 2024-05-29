@@ -57,7 +57,8 @@ handle_call(is_connected, _, #state{ws_up = Up} = S) ->
 handle_cast({connect, Server, Port}, #state{gun_pid = undefined} = S) ->
     case grisp_connect_tls:connect(Server, Port) of
         {ok, GunPid} ->
-            {noreply, #state{gun_pid = GunPid}};
+            GunRef = monitor(process, GunPid),
+            {noreply, #state{gun_pid = GunPid, gun_ref = GunRef}};
         Error ->
             ?LOG_ERROR(#{event => connection_failure, reason => Error}),
             {noreply, S}
@@ -73,10 +74,9 @@ handle_cast({send, Payload},  #state{gun_pid = Pid, ws_stream = Stream} = S) ->
 
 handle_info({gun_up, GunPid, _}, #state{gun_pid = GunPid} = S) ->
     ?LOG_INFO(#{event => connection_enstablished}),
-    GunRef = monitor(process, GunPid),
     WsStream = gun:ws_upgrade(GunPid, "/grisp-connect/ws",[],
                               #{silence_pings => false}),
-    NewState = S#state{gun_pid = GunPid, gun_ref = GunRef, ws_stream = WsStream},
+    NewState = S#state{gun_pid = GunPid, ws_stream = WsStream},
     {noreply, NewState};
 handle_info({gun_up, Pid, http}, #state{gun_pid = GunPid} = S) ->
     ?LOG_WARNING("Ignoring unexpected gun_up http message"
