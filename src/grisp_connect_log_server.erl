@@ -78,7 +78,7 @@ jsonify(Event) ->
 jsonify_msg(#{msg := {string, String}} = Event) ->
     maps:put(msg, unicode:characters_to_binary(String), Event);
 jsonify_msg(#{msg := {report, Report}} = Event) ->
-    case jsx:is_term(Report) of
+    case is_json_compatible(Report) of
         true ->
             maps:put(msg, Report, Event);
         false ->
@@ -108,3 +108,9 @@ jsonify_meta(#{meta := Meta} = Event) ->
     Optional = maps:without(maps:keys(Default), Meta),
     FilterFun = fun(Key, Value) -> jsx:is_term(#{Key => Value}) end,
     maps:put(meta, maps:merge(maps:filter(FilterFun, Optional), Default), Event).
+
+is_json_compatible(Term) ->
+    try jsx:is_term(Term)
+    catch error:_ ->
+        false
+    end.

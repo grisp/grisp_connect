@@ -18,11 +18,13 @@
     gun_pid,
     gun_ref,
     ws_stream,
-    ws_up = false
+    ws_up = false,
+    ping_timer
 }).
 
 -define(disconnected_state,
-        #state{gun_pid = undefined, gun_ref = undefine, ws_up = false}).
+        #state{gun_pid = undefined, gun_ref = undefine,
+               ws_up = false, ping_timer = undefined}).
 
 -include_lib("kernel/include/logger.hrl").
 
@@ -72,31 +74,59 @@ handle_cast({send, Payload},  #state{gun_pid = Pid, ws_stream = Stream} = S) ->
 handle_info({gun_up, GunPid, _}, #state{gun_pid = GunPid} = S) ->
     ?LOG_INFO(#{event => connection_enstablished}),
     GunRef = monitor(process, GunPid),
-    WsStream = gun:ws_upgrade(GunPid, "/grisp-connect/ws"),
+    WsStream = gun:ws_upgrade(GunPid, "/grisp-connect/ws",[],
+                              #{silence_pings => false}),
     NewState = S#state{gun_pid = GunPid, gun_ref = GunRef, ws_stream = WsStream},
     {noreply, NewState};
+handle_info({gun_up, Pid, http}, #state{gun_pid = GunPid} = S) ->
+    ?LOG_WARNING("Ignoring unexpected gun_up http message"
+                 " from pid ~p, current pid is ~p", [Pid, GunPid]),
+    {noreply, S};
 handle_info({gun_upgrade, Pid, Stream, [<<"websocket">>], _},
             #state{gun_pid = Pid, ws_stream = Stream} = S) ->
     ?LOG_INFO(#{event => ws_upgrade}),
-    {noreply, S#state{ws_up = true}};
+    {noreply, S#state{ws_up = true, ping_timer = start_ping_timer()}};
 handle_info({gun_response, Pid, Stream, _, Status, _Headers},
             #state{gun_pid = Pid, ws_stream = Stream} = S) ->
     ?LOG_ERROR(#{event => ws_upgrade_failure, status => Status}),
     {noreply, shutdown_gun(S)};
-handle_info({gun_ws, Conn, Stream, {text, Text}},
-            #state{gun_pid = Conn, ws_stream = Stream} = S) ->
+handle_info({gun_ws, Pid, Stream, ping},
+            #state{gun_pid = Pid, ws_stream = Stream,
+                   ping_timer = PingTimer} = S) ->
+    timer:cancel(PingTimer),
+    {noreply, S#state{ping_timer = start_ping_timer()}};
+handle_info({gun_ws, Pid, Stream, {text, Text}},
+            #state{gun_pid = Pid, ws_stream = Stream} = S) ->
     grisp_connect_client:handle_message(Text),
     {noreply, S};
 handle_info({gun_down, Pid, ws, closed, [Stream]}, #state{gun_pid = Pid, ws_stream = Stream} = S) ->
     ?LOG_WARNING(#{event => ws_closed}),
     grisp_connect_client:disconnected(),
     {noreply, shutdown_gun(S)};
+handle_info({'DOWN', _, process, Pid, Reason}, #state{gun_pid = Pid,
+                                                      ping_timer = Tref} = S) ->
+    ?LOG_WARNING(#{event => gun_crash, reason => Reason}),
+    timer:cancel(Tref),
+    grisp_connect_client:disconnected(),
+    {noreply, S?disconnected_state};
+handle_info(ping_timeout, S) ->
+    ?LOG_WARNING(#{event => ping_timeout}),
+    grisp_connect_client:disconnected(),
+    {noreply, shutdown_gun(S)};
 handle_info(M, S) ->
-    ?LOG_WARNING(#{event => unhandled_info, info => M}),
+    ?LOG_WARNING(#{event => unhandled_info, info => M, state => S}),
     {noreply, S}.
 
 % internal functions -----------------------------------------------------------
 
-shutdown_gun(#state{gun_pid = Pid} = State) ->
+shutdown_gun(#state{gun_pid = Pid, gun_ref = GunRef,
+                    ping_timer = PingTimer} = State) ->
+    timer:cancel(PingTimer),
+    demonitor(GunRef),
     gun:shutdown(Pid),
     State?disconnected_state.
+
+start_ping_timer() ->
+    {ok, Timeout} = application:get_env(grisp_connect, ws_ping_timeout),
+    {ok, Tref} = timer:send_after(Timeout, ping_timeout),
+    Tref.

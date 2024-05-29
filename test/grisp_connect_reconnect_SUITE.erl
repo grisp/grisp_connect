@@ -1,4 +1,4 @@
--module(grisp_connect_api_SUITE).
+-module(grisp_connect_reconnect_SUITE).
 
 -behaviour(ct_suite).
 -include_lib("common_test/include/ct.hrl").
@@ -32,24 +32,25 @@ init_per_suite(Config) ->
     application:set_env(seabac, policy_file, PolicyFile),
 
     Config2 = grisp_connect_manager:start(Config),
-     grisp_connect_manager:kraft_start(CertDir),
     [{cert_dir, CertDir} | Config2].
 
 end_per_suite(Config) ->
     grisp_connect_manager:cleanup_apps(?config(apps, Config)).
 
-init_per_testcase(TestCase, Config) ->
+init_per_testcase(_, Config) ->
+    % the kraf instance links to this process
+    process_flag(trap_exit, true),
+    {ok, _} = application:ensure_all_started(kraft),
+    KraftRef = grisp_connect_manager:kraft_start(?config(cert_dir, Config)),
     {ok, _} = application:ensure_all_started(grisp_emulation),
     application:set_env(grisp_connect, test_cert_dir, ?config(cert_dir, Config)),
     {ok, _} = application:ensure_all_started(grisp_connect),
-    case TestCase of
-        auto_connect_test -> ok;
-        _ -> ok = wait_connection()
-    end,
-    Config.
+    [{kraft_instance, KraftRef} | Config].
 
 end_per_testcase(_, Config) ->
     ok = application:stop(grisp_connect),
+    kraft:stop(?config(kraft_instance, Config)),
+    ok = application:stop(kraft),
     mnesia:activity(transaction, fun() ->
         mnesia:delete({grisp_device, serial_number()})
     end),
@@ -58,20 +59,32 @@ end_per_testcase(_, Config) ->
 
 %--- Tests ---------------------------------------------------------------------
 
-auto_connect_test(_) ->
+reconnect_on_gun_crash_test(_) ->
+    ?assertMatch(ok, wait_connection(100)),
+    {state, GunPid, _, _, _, _} = sys:get_state(grisp_connect_ws),
+    proc_lib:stop(GunPid),
+    ?assertMatch(ok, wait_disconnection()),
     ?assertMatch(ok, wait_connection()).
 
-ping_test(_) ->
-    ?assertMatch({ok, <<"pang">>}, grisp_connect:ping()).
+reconnect_on_disconnection_test(Config) ->
+    ?assertMatch(ok, wait_connection()),
+    ok = kraft:stop(?config(kraft_instance, Config)),
+    ?assertMatch(ok, wait_disconnection()),
+    KraftRef2 = grisp_connect_manager:kraft_start(cert_dir()),
+    ?assertMatch(ok, wait_connection(100)),
+    [{kraft_instance, KraftRef2} | proplists:delete(kraft_instance, Config)].
 
-link_device_test(_) ->
-    ?assertMatch({error, token_undefined}, grisp_connect:link_device()),
-    application:set_env(grisp_connect, device_linking_token, <<"token">>),
-    ?assertMatch({error, invalid_token}, grisp_connect:link_device()),
-    Token = grisp_manager_token:get_token(<<"Testuser">>),
-    application:set_env(grisp_connect, device_linking_token, Token),
-    ?assertMatch({ok, <<"ok">>}, grisp_connect:link_device()),
-    ?assertMatch({ok, <<"pong">>}, grisp_connect:ping()).
+reconnect_on_ping_timeout_test(_) ->
+    ?assertMatch(ok, wait_connection()),
+    {state, GunPid, _, _, _, _} = sys:get_state(grisp_connect_ws),
+    proc_lib:stop(GunPid),
+    % Now decrease ping timeout so that the WS closes after just 1 second
+    application:set_env(grisp_connect, ws_ping_timeout, 1000),
+    ?assertMatch(ok, wait_disconnection()),
+    ?assertMatch(ok, wait_connection(100)),
+    ?assertMatch(ok, wait_disconnection()),
+    ?assertMatch(ok, wait_connection(100)),
+    ?assertMatch(ok, wait_disconnection()).
 
 %--- Internal ------------------------------------------------------------------
 

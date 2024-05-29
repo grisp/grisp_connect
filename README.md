@@ -23,6 +23,11 @@ Such client is disabled by default (`{ntp, false}`), and is not required to auth
 Accepts an integer that represents time in milliseconds, default value is `5_000`.
 Allows to tweak the timeout of each API request going through the websocket.
 
+### ws_ping_timeout
+Accepts an integer that represents time in milliseconds, default value is `60_000`.
+Allows to tweak the timeout between expected ping frames from the server.
+If the timeout is exceeded, the socket is closed and a new connection is attempted.
+
 ### logs_interval
 
 Accepts an integer that represents time in milliseconds, default value is `2_000`.

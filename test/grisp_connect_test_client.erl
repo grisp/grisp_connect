@@ -6,10 +6,13 @@
 -export([cert_dir/0]).
 -export([serial_number/0]).
 -export([wait_connection/0]).
+-export([wait_connection/1]).
+-export([wait_disconnection/0]).
+-export([wait_disconnection/1]).
 
 %--- API -----------------------------------------------------------------------
 
-cert_dir() -> filename:join(code:lib_dir(grisp_connect, test), "certs"). 
+cert_dir() -> filename:join(code:lib_dir(grisp_connect, test), "certs").
 
 serial_number() -> <<"0000">>.
 
@@ -17,7 +20,7 @@ wait_connection() ->
     wait_connection(20).
 
 wait_connection(0) ->
-    ct:pal("grisp_connect state:~n~p~n", [sys:get_state(grisp_connect_client)]),
+    ct:pal("grisp_connect_ws state:~n~p~n", [sys:get_state(grisp_connect_ws)]),
     {error, timeout};
 wait_connection(N) ->
     case grisp_connect:is_connected() of
@@ -25,4 +28,18 @@ wait_connection(N) ->
        false ->
            ct:sleep(100),
            wait_connection(N - 1)
+    end.
+
+wait_disconnection() ->
+    wait_disconnection(20).
+
+wait_disconnection(0) ->
+    ct:pal("grisp_connect_ws state:~n~p~n", [sys:get_state(grisp_connect_ws)]),
+    {error, timeout};
+wait_disconnection(N) ->
+    case grisp_connect:is_connected() of
+        true ->
+            ct:sleep(100),
+            wait_disconnection(N - 1);
+        false -> ok
     end.

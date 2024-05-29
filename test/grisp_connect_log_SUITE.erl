@@ -28,7 +28,8 @@ init_per_suite(Config) ->
     ?assertEqual(ok, file:write_file(PolicyFile, <<>>)),
     application:set_env(seabac, policy_file, PolicyFile),
 
-    Config2 = grisp_connect_manager:start(CertDir, Config),
+    Config2 = grisp_connect_manager:start(Config),
+    grisp_connect_manager:kraft_start(CertDir),
     grisp_connect_manager:link_device(),
     [{cert_dir, CertDir} | Config2].
 
