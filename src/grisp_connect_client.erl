@@ -156,12 +156,16 @@ handle_common({timeout, ID}, request, _, #data{requests = Requests} = Data) ->
     {keep_state,
      Data#data{requests = maps:remove(ID, Requests)},
      [{reply, Caller, {error, timeout}}]};
-handle_common(E, OldS, NewS, Data) ->
-    ?LOG_ERROR(#{event => unhandled_gen_statem_event,
-                 gen_statem_event => E,
-                 old_state => OldS,
-                 new_state => NewS}),
-    {keep_state, Data}.
+handle_common(cast, Cast, _, _) ->
+    error({unexpected_cast, Cast});
+handle_common({call, _}, Call, _, _) ->
+    error({unexpected_call, Call});
+handle_common(info, Info, State, Data) ->
+    ?LOG_ERROR(#{event => unexpected_info,
+                 info => Info,
+                 state => State,
+                 data => Data}),
+    keep_state_and_data.
 
 % INTERNALS --------------------------------------------------------------------
 
