@@ -137,16 +137,18 @@ handle_event(enter, _OldState, connecting, _Data) ->
     {ok, Port} = application:get_env(grisp_connect, port),
     ?LOG_NOTICE(#{event => connecting, domain => Domain, port => Port}),
     grisp_connect_ws:connect(Domain, Port),
-    {keep_state_and_data, [{state_timeout, 0, retry}]};
-handle_event(state_timeout, retry, connecting, Data) ->
+    {keep_state_and_data, [{state_timeout, 0, wait}]};
+handle_event(state_timeout, wait, connecting, Data) ->
     case grisp_connect_ws:is_connected() of
         true ->
             ?LOG_NOTICE(#{event => connected}),
             {next_state, connected, Data};
         false ->
             ?LOG_INFO(#{event => waiting_ws_connection}),
-            {keep_state_and_data, [{state_timeout, ?STD_TIMEOUT, retry}]}
+            {keep_state_and_data, [{state_timeout, ?STD_TIMEOUT, wait}]}
     end;
+handle_event(cast, disconnected, connecting, _Data) ->
+    repeat_state_and_data;
 
 % CONNECTED
 handle_event(enter, _OldState, connected, _Data) ->
