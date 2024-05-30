@@ -28,7 +28,8 @@
 
 -define(STD_TIMEOUT, 1000).
 -define(HANDLE_COMMON,
-    ?FUNCTION_NAME(T, C, D) -> handle_common(T, C, ?FUNCTION_NAME, D)).
+    ?FUNCTION_NAME(EventType, EventContent, Data) ->
+        handle_common(EventType, EventContent, ?FUNCTION_NAME, Data)).
 
 -record(data, {
     requests = #{}
@@ -78,8 +79,8 @@ idle(cast, connect, Data) ->
     {next_state, waiting_ip, Data};
 ?HANDLE_COMMON.
 
-waiting_ip(enter, _OldState, Data) ->
-    {next_state, waiting_ip, Data, [{state_timeout, 0, retry}]};
+waiting_ip(enter, _OldState, _Data) ->
+    {keep_state_and_data, [{state_timeout, 0, retry}]};
 waiting_ip(state_timeout, retry, Data) ->
     case check_inet_ipv4() of
         {ok, IP} ->
@@ -143,19 +144,18 @@ connected({call, From}, {request, Method, Type, Params},
 ?HANDLE_COMMON.
 
 % Common event handling appended as last match case to each state_function
-handle_common(cast, connect, _State, _Data)->
+handle_common(cast, connect, State, _Data) when State =/= idle ->
     keep_state_and_data;
-handle_common({call, From}, is_connected, _, _) ->
+handle_common({call, From}, is_connected, State, _) when State =/= connected ->
         {keep_state_and_data, [{reply, From, false}]};
-handle_common({call, From}, {request, _, _, _}, _State, _Data) ->
+handle_common({call, From}, {request, _, _, _}, State, _Data)
+when State =/= connected ->
     {keep_state_and_data, [{reply, From, {error, disconnected}}]};
 handle_common({timeout, ID}, request, _, #data{requests = Requests} = Data) ->
     Caller = maps:get(ID, Requests),
     {keep_state,
      Data#data{requests = maps:remove(ID, Requests)},
      [{reply, Caller, {error, timeout}}]};
-handle_common({call, From}, _, State, Data) ->
-    {keep_state, Data, [{reply, From, {bad_client_state, State}}]};
 handle_common(E, OldS, NewS, Data) ->
     ?LOG_ERROR(#{event => unhandled_gen_statem_event,
                  gen_statem_event => E,
