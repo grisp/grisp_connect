@@ -17,7 +17,8 @@
 
 -behaviour(gen_statem).
 -export([init/1, terminate/3, code_change/4, callback_mode/0]).
-% State Funcitons
+
+% State Functions
 -export([idle/3]).
 -export([waiting_ip/3]).
 -export([connecting/3]).
@@ -71,14 +72,12 @@ callback_mode() -> [state_functions, state_enter].
 
 %%% STATE CALLBACKS ------------------------------------------------------------
 
-% IDLE
 idle(enter, _OldState, _Data) ->
     keep_state_and_data;
 idle(cast, connect, Data) ->
     {next_state, waiting_ip, Data};
 ?HANDLE_COMMON.
 
-% WAITING_IP
 waiting_ip(enter, _OldState, Data) ->
     {next_state, waiting_ip, Data, [{state_timeout, 0, retry}]};
 waiting_ip(state_timeout, retry, Data) ->
@@ -92,7 +91,6 @@ waiting_ip(state_timeout, retry, Data) ->
     end;
 ?HANDLE_COMMON.
 
-% CONNECTING
 connecting(enter, _OldState, _Data) ->
     {ok, Domain} = application:get_env(grisp_connect, domain),
     {ok, Port} = application:get_env(grisp_connect, port),
@@ -112,7 +110,6 @@ connecting(cast, disconnected, _Data) ->
     repeat_state_and_data;
 ?HANDLE_COMMON.
 
-% CONNECTED
 connected(enter, _OldState, _Data) ->
     grisp_connect_log_server:start(),
     keep_state_and_data;
