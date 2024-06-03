@@ -16,11 +16,20 @@
 -export([handle_message/1]).
 
 -behaviour(gen_statem).
--export([init/1, terminate/3, code_change/4, callback_mode/0, handle_event/4]).
+-export([init/1, terminate/3, code_change/4, callback_mode/0]).
+
+% State Functions
+-export([idle/3]).
+-export([waiting_ip/3]).
+-export([connecting/3]).
+-export([connected/3]).
 
 -include_lib("kernel/include/logger.hrl").
 
 -define(STD_TIMEOUT, 1000).
+-define(HANDLE_COMMON,
+    ?FUNCTION_NAME(EventType, EventContent, Data) ->
+        handle_common(EventType, EventContent, ?FUNCTION_NAME, Data)).
 
 -record(data, {
     requests = #{}
@@ -60,33 +69,58 @@ terminate(_Reason, _State, _Data) -> ok.
 
 code_change(_Vsn, State, Data, _Extra) -> {ok, State, Data}.
 
-callback_mode() -> [handle_event_function, state_enter].
+callback_mode() -> [state_functions, state_enter].
 
 %%% STATE CALLBACKS ------------------------------------------------------------
 
-% Generic events handling
-handle_event(cast, connect, State, _Data) when State =/= idle ->
+idle(enter, _OldState, _Data) ->
     keep_state_and_data;
+idle(cast, connect, Data) ->
+    {next_state, waiting_ip, Data};
+?HANDLE_COMMON.
 
-handle_event({call, From}, is_connected, connected, _) ->
+waiting_ip(enter, _OldState, _Data) ->
+    {keep_state_and_data, [{state_timeout, 0, retry}]};
+waiting_ip(state_timeout, retry, Data) ->
+    case check_inet_ipv4() of
+        {ok, IP} ->
+            ?LOG_INFO(#{event => checked_ip, ip => IP}),
+            {next_state, connecting, Data};
+        invalid ->
+            ?LOG_INFO(#{event => waiting_ip}),
+            {next_state, waiting_ip, Data, [{state_timeout, ?STD_TIMEOUT, retry}]}
+    end;
+?HANDLE_COMMON.
+
+connecting(enter, _OldState, _Data) ->
+    {ok, Domain} = application:get_env(grisp_connect, domain),
+    {ok, Port} = application:get_env(grisp_connect, port),
+    ?LOG_NOTICE(#{event => connecting, domain => Domain, port => Port}),
+    grisp_connect_ws:connect(Domain, Port),
+    {keep_state_and_data, [{state_timeout, 0, wait}]};
+connecting(state_timeout, wait, Data) ->
+    case grisp_connect_ws:is_connected() of
+        true ->
+            ?LOG_NOTICE(#{event => connected}),
+            {next_state, connected, Data};
+        false ->
+            ?LOG_INFO(#{event => waiting_ws_connection}),
+            {keep_state_and_data, [{state_timeout, ?STD_TIMEOUT, wait}]}
+    end;
+connecting(cast, disconnected, _Data) ->
+    repeat_state_and_data;
+?HANDLE_COMMON.
+
+connected(enter, _OldState, _Data) ->
+    grisp_connect_log_server:start(),
+    keep_state_and_data;
+connected({call, From}, is_connected, _) ->
     {keep_state_and_data, [{reply, From, true}]};
-handle_event({call, From}, is_connected, _, _) ->
-    {keep_state_and_data, [{reply, From, false}]};
-
-handle_event({call, From}, {request, _, _, _}, State, _Data)
-when State =/= connected ->
-    {keep_state_and_data, [{reply, From, {error, disconnected}}]};
-handle_event({call, From}, {request, Method, Type, Params}, connected,
-            #data{requests = Requests} = Data) ->
-    {ID, Payload} = grisp_connect_api:request(Method, Type, Params),
-    grisp_connect_ws:send(Payload),
-    NewRequests = Requests#{ID => From},
-    {keep_state,
-     Data#data{requests = NewRequests},
-     [{{timeout, ID}, request_timeout(), request}]};
-
-handle_event(cast, {handle_message, Payload}, connected,
-            #data{requests = Requests} = Data) ->
+connected(cast, disconnected, Data) ->
+    ?LOG_WARNING(#{event => disconnected}),
+    grisp_connect_log_server:stop(),
+    {next_state, waiting_ip, Data};
+connected(cast, {handle_message, Payload}, #data{requests = Requests} = Data) ->
     Replies = grisp_connect_api:handle_msg(Payload),
     % A reduce operation is needed to support jsonrpc batch comunications
     case Replies of
@@ -99,72 +133,39 @@ handle_event(cast, {handle_message, Payload}, connected,
             {OtherRequests, Actions} = dispatch_response(ID, Response, Requests),
             {keep_state, Data#data{requests = OtherRequests}, Actions}
     end;
+connected({call, From}, {request, Method, Type, Params},
+          #data{requests = Requests} = Data) ->
+    {ID, Payload} = grisp_connect_api:request(Method, Type, Params),
+    grisp_connect_ws:send(Payload),
+    NewRequests = Requests#{ID => From},
+    {keep_state,
+     Data#data{requests = NewRequests},
+     [{{timeout, ID}, request_timeout(), request}]};
+?HANDLE_COMMON.
 
-handle_event({timeout, ID}, request, connected,
-            #data{requests = Requests} = Data) ->
+% Common event handling appended as last match case to each state_function
+handle_common(cast, connect, State, _Data) when State =/= idle ->
+    keep_state_and_data;
+handle_common({call, From}, is_connected, State, _) when State =/= connected ->
+        {keep_state_and_data, [{reply, From, false}]};
+handle_common({call, From}, {request, _, _, _}, State, _Data)
+when State =/= connected ->
+    {keep_state_and_data, [{reply, From, {error, disconnected}}]};
+handle_common({timeout, ID}, request, _, #data{requests = Requests} = Data) ->
     Caller = maps:get(ID, Requests),
     {keep_state,
-        Data#data{requests = maps:remove(ID, Requests)},
-        [{reply, Caller, {error, timeout}}]};
-
-handle_event({call, From}, _, State, Data) ->
-    {keep_state, Data, [{reply, From, {bad_client_state, State}}]};
-
-% STATE MACHINE Transitions
-
-% IDLE
-handle_event(enter, _OldState, idle, _Data) ->
-    keep_state_and_data;
-handle_event(cast, connect, idle, Data) ->
-    {next_state, waiting_ip, Data};
-
-% WAITING_IP
-handle_event(enter, _OldState, waiting_ip, Data) ->
-    {next_state, waiting_ip, Data, [{state_timeout, 0, retry}]};
-handle_event(state_timeout, retry, waiting_ip, Data) ->
-    case check_inet_ipv4() of
-        {ok, IP} ->
-            ?LOG_INFO(#{event => checked_ip, ip => IP}),
-            {next_state, connecting, Data};
-        invalid ->
-            ?LOG_INFO(#{event => waiting_ip}),
-            {next_state, waiting_ip, Data, [{state_timeout, ?STD_TIMEOUT, retry}]}
-    end;
-
-% CONNECTING
-handle_event(enter, _OldState, connecting, _Data) ->
-    {ok, Domain} = application:get_env(grisp_connect, domain),
-    {ok, Port} = application:get_env(grisp_connect, port),
-    ?LOG_NOTICE(#{event => connecting, domain => Domain, port => Port}),
-    grisp_connect_ws:connect(Domain, Port),
-    {keep_state_and_data, [{state_timeout, 0, wait}]};
-handle_event(state_timeout, wait, connecting, Data) ->
-    case grisp_connect_ws:is_connected() of
-        true ->
-            ?LOG_NOTICE(#{event => connected}),
-            {next_state, connected, Data};
-        false ->
-            ?LOG_INFO(#{event => waiting_ws_connection}),
-            {keep_state_and_data, [{state_timeout, ?STD_TIMEOUT, wait}]}
-    end;
-handle_event(cast, disconnected, connecting, _Data) ->
-    repeat_state_and_data;
-
-% CONNECTED
-handle_event(enter, _OldState, connected, _Data) ->
-    grisp_connect_log_server:start(),
-    keep_state_and_data;
-handle_event(cast, disconnected, connected, Data) ->
-    ?LOG_WARNING(#{event => disconnected}),
-    grisp_connect_log_server:stop(),
-    {next_state, waiting_ip, Data};
-
-handle_event(E, OldS, NewS, Data) ->
-    ?LOG_ERROR(#{event => unhandled_gen_statem_event,
-                 gen_statem_event => E,
-                 old_state => OldS,
-                 new_state => NewS}),
-    {keep_state, Data}.
+     Data#data{requests = maps:remove(ID, Requests)},
+     [{reply, Caller, {error, timeout}}]};
+handle_common(cast, Cast, _, _) ->
+    error({unexpected_cast, Cast});
+handle_common({call, _}, Call, _, _) ->
+    error({unexpected_call, Call});
+handle_common(info, Info, State, Data) ->
+    ?LOG_ERROR(#{event => unexpected_info,
+                 info => Info,
+                 state => State,
+                 data => Data}),
+    keep_state_and_data.
 
 % INTERNALS --------------------------------------------------------------------
 
