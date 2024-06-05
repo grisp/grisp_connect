@@ -99,8 +99,15 @@ handle_info({gun_ws, Pid, Stream, {text, Text}},
             #state{gun_pid = Pid, ws_stream = Stream} = S) ->
     grisp_connect_client:handle_message(Text),
     {noreply, S};
+handle_info({gun_ws, Pid, Stream, {close, 1011, Message}},
+            #state{gun_pid = Pid, ws_stream = Stream} = S) ->
+    ?LOG_WARNING(#{event => stream_closed, reason => Message}),
+    {noreply, S};
 handle_info({gun_down, Pid, ws, closed, [Stream]}, #state{gun_pid = Pid, ws_stream = Stream} = S) ->
     ?LOG_WARNING(#{event => ws_closed}),
+    grisp_connect_client:disconnected(),
+    {noreply, shutdown_gun(S)};
+handle_info({gun_down, Pid, ws, normal, _}, #state{gun_pid = Pid} = S) ->
     grisp_connect_client:disconnected(),
     {noreply, shutdown_gun(S)};
 handle_info({'DOWN', _, process, Pid, Reason}, #state{gun_pid = Pid,
