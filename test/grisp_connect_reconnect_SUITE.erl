@@ -44,6 +44,7 @@ init_per_testcase(_, Config) ->
     KraftRef = grisp_connect_manager:kraft_start(?config(cert_dir, Config)),
     {ok, _} = application:ensure_all_started(grisp_emulation),
     application:set_env(grisp_connect, test_cert_dir, ?config(cert_dir, Config)),
+    application:set_env(grisp_connect, ws_ping_timeout, 60_000),
     {ok, _} = application:ensure_all_started(grisp_connect),
     [{kraft_instance, KraftRef} | Config].
 
@@ -85,6 +86,24 @@ reconnect_on_ping_timeout_test(_) ->
     ?assertMatch(ok, wait_disconnection()),
     ?assertMatch(ok, wait_connection(100)),
     ?assertMatch(ok, wait_disconnection()).
+
+reconnect_on_closed_frame_test(_) ->
+    ?assertMatch(ok, wait_connection()),
+    % Delete a table to cause an internal crash, this is handled by cowboy
+    % and generates a close frame,
+    % triggering a normal exit from gun on the client
+    mnesia:delete_table(grisp_manager_token),
+    TestProc = self(),
+    spawn(fun() ->
+        Result = grisp_connect:link_device(<<"">>),
+        TestProc ! Result
+    end),
+    ?assertMatch(ok, wait_disconnection()),
+    ?assertMatch(ok, wait_connection(100)),
+    receive
+        {error, timeout} -> ok
+        after 5000 -> error(timeout_not_reached)
+    end.
 
 %--- Internal ------------------------------------------------------------------
 
