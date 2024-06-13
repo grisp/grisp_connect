@@ -22,10 +22,6 @@
     ping_timer
 }).
 
--define(disconnected_state,
-        #state{gun_pid = undefined, gun_ref = undefine,
-               ws_up = false, ping_timer = undefined}).
-
 -include_lib("kernel/include/logger.hrl").
 
 %--- API Functions -------------------------------------------------------------
@@ -116,7 +112,7 @@ handle_info({'DOWN', _, process, Pid, Reason}, #state{gun_pid = Pid,
     ?LOG_WARNING(#{event => gun_crash, reason => Reason}),
     timer:cancel(Tref),
     grisp_connect_client:disconnected(),
-    {noreply, S?disconnected_state};
+    {noreply, disconnected_state(S)};
 handle_info(ping_timeout, S) ->
     ?LOG_WARNING(#{event => ping_timeout}),
     grisp_connect_client:disconnected(),
@@ -132,9 +128,13 @@ shutdown_gun(#state{gun_pid = Pid, gun_ref = GunRef,
     timer:cancel(PingTimer),
     demonitor(GunRef),
     gun:shutdown(Pid),
-    State?disconnected_state.
+    disconnected_state(State).
 
 start_ping_timer() ->
     {ok, Timeout} = application:get_env(grisp_connect, ws_ping_timeout),
     {ok, Tref} = timer:send_after(Timeout, ping_timeout),
     Tref.
+
+disconnected_state(State) ->
+    State#state{gun_pid = undefined, gun_ref = undefined,
+                ws_up = false, ping_timer = undefined}.
