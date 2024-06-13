@@ -108,6 +108,7 @@ handle_info({gun_down, Pid, ws, closed, [Stream]}, #state{gun_pid = Pid, ws_stre
     grisp_connect_client:disconnected(),
     {noreply, shutdown_gun(S)};
 handle_info({gun_down, Pid, ws, normal, _}, #state{gun_pid = Pid} = S) ->
+    ?LOG_INFO(#{event => ws_closed, reason => normal}),
     grisp_connect_client:disconnected(),
     {noreply, shutdown_gun(S)};
 handle_info({'DOWN', _, process, Pid, Reason}, #state{gun_pid = Pid,
