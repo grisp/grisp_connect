@@ -72,8 +72,8 @@ handle_info({gun_up, GunPid, _}, #state{gun_pid = GunPid} = S) ->
     ?LOG_INFO(#{event => connection_enstablished}),
     WsStream = gun:ws_upgrade(GunPid, "/grisp-connect/ws",[],
                               #{silence_pings => false}),
-    NewState = S#state{gun_pid = GunPid, ws_stream = WsStream},
-    {noreply, NewState};
+    NewS = S#state{gun_pid = GunPid, ws_stream = WsStream},
+    {noreply, NewS};
 handle_info({gun_up, Pid, http}, #state{gun_pid = GunPid} = S) ->
     ?LOG_WARNING("Ignoring unexpected gun_up http message"
                  " from pid ~p, current pid is ~p", [Pid, GunPid]),
@@ -124,17 +124,17 @@ handle_info(M, S) ->
 % internal functions -----------------------------------------------------------
 
 shutdown_gun(#state{gun_pid = Pid, gun_ref = GunRef,
-                    ping_timer = PingTimer} = State) ->
+                    ping_timer = PingTimer} = S) ->
     timer:cancel(PingTimer),
     demonitor(GunRef),
     gun:shutdown(Pid),
-    disconnected_state(State).
+    disconnected_state(S).
 
 start_ping_timer() ->
     {ok, Timeout} = application:get_env(grisp_connect, ws_ping_timeout),
     {ok, Tref} = timer:send_after(Timeout, ping_timeout),
     Tref.
 
-disconnected_state(State) ->
-    State#state{gun_pid = undefined, gun_ref = undefined,
-                ws_up = false, ping_timer = undefined}.
+disconnected_state(S) ->
+    S#state{gun_pid = undefined, gun_ref = undefined,
+            ws_up = false, ping_timer = undefined}.
