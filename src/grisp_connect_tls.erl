@@ -40,6 +40,31 @@ ssl_opts(_) ->
 
 -else.
 
+-if(?OTP_RELEASE >= 27).
+
+ssl_opts(ServerName) ->
+    case client_chain() of
+        {error, _Reason} = Error -> Error;
+        {ok, ClientChain} ->
+            {ok, [
+                {verify, verify_peer},
+                {depth, 99},
+                {cacerts, certifi:cacerts() ++ server_chain(ServerName)},
+                {customize_hostname_check, [
+                    {match_fun, public_key:pkix_verify_hostname_match_fun(https)}
+                ]},
+                {certs_keys, [#{
+                    cert => ClientChain,
+                    key => #{
+                        algorithm => ecdsa,
+                        sign_fun => fun grisp_cryptoauth:sign_fun/3
+                    }
+                }]}
+            ]}
+    end.
+
+-else. % ?OTP_RELEASE < 27
+
 ssl_opts(ServerName) ->
     case client_chain() of
         {error, _Reason} = Error -> Error;
@@ -58,6 +83,8 @@ ssl_opts(ServerName) ->
                 }}
             ]}
     end.
+
+-endif.
 
 -endif.
 
