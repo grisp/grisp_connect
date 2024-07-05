@@ -19,3 +19,7 @@ rebar3.crashdump
 *~
 .DS_Store
 doc
+.tool-versions
+eeprom_*.dat
+dummy.img
+priv/server/*

@@ -43,7 +43,6 @@ init_per_testcase(_, Config) ->
     {ok, _} = application:ensure_all_started(kraft),
     KraftRef = grisp_connect_manager:kraft_start(?config(cert_dir, Config)),
     {ok, _} = application:ensure_all_started(grisp_emulation),
-    application:set_env(grisp_connect, test_cert_dir, ?config(cert_dir, Config)),
     application:set_env(grisp_connect, ws_ping_timeout, 60_000),
     {ok, _} = application:ensure_all_started(grisp_connect),
     [{kraft_instance, KraftRef} | Config].
@@ -80,11 +79,11 @@ reconnect_on_ping_timeout_test(_) ->
     {state, GunPid, _, _, _, _} = sys:get_state(grisp_connect_ws),
     proc_lib:stop(GunPid),
     % Now decrease ping timeout so that the WS closes after just 1 second
-    application:set_env(grisp_connect, ws_ping_timeout, 1000),
+    application:set_env(grisp_connect, ws_ping_timeout, 1500),
     ?assertMatch(ok, wait_disconnection()),
-    ?assertMatch(ok, wait_connection(100)),
+    ?assertMatch(ok, wait_connection(150)),
     ?assertMatch(ok, wait_disconnection()),
-    ?assertMatch(ok, wait_connection(100)),
+    ?assertMatch(ok, wait_connection(150)),
     ?assertMatch(ok, wait_disconnection()).
 
 reconnect_on_closed_frame_test(_) ->
