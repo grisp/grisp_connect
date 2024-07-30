@@ -14,25 +14,28 @@
 -export([sync/2]).
 -export([chunk/2]).
 
-% Logger Callbacks
+% Behaviour logger_handler callback functions
 -export([adding_handler/1]).
 -export([changing_config/3]).
 -export([removing_handler/1]).
 -export([log/2]).
 -export([filter_config/1]).
 
-% Logger Formatter Callbacks
+% Behaviour logger_formater callback functions
 -export([format/2]).
+-export([check_config/4]).
 
 % logger_h_common Callbacks
 -export([init/2]).
--export([check_config/4]).
 -export([config_changed/3]).
 -export([reset_state/2]).
 -export([filesync/3]).
 -export([write/4]).
 -export([handle_info/3]).
 -export([terminate/3]).
+
+% % Log filtering functions
+-export([filter_out/2]).
 
 % Internal Callbacks
 -export([queue_ctrl_init/1]).
@@ -70,7 +73,7 @@ sync(Seq, DroppedConfirmed) when
 chunk(MaxCount, MaxBytes) ->
     insert_drop_event(call(whereis(?MODULE), {chunk, MaxCount, MaxBytes})).
 
-%--- Logger Callbacks ----------------------------------------------------------
+%--- Behaviour logger_handler Callback Callbacks -------------------------------
 
 adding_handler(Config) ->
     logger_h_common:adding_handler(Config).
@@ -87,7 +90,7 @@ log(LogEvent, Config) ->
 filter_config(Config) ->
     logger_h_common:filter_config(Config).
 
-%--- Logger Formatter Callbacks ------------------------------------------------
+%--- Behaviour logger_formater Callback Functions ------------------------------
 
 format(Event, Config) ->
     case Config of
@@ -106,6 +109,9 @@ format(Event, Config) ->
             Encoded
     end.
 
+check_config(_Name, _SetOrUpdate, _OldHConfig, NewHConfig0) ->
+    {ok, NewHConfig0}.
+
 %--- logger_h_common Callbacks -------------------------------------------------
 
 init(_Name, UserConfig) ->
@@ -121,9 +127,6 @@ init(_Name, UserConfig) ->
         end,
     Config = maps:merge(?DEFAULT_CONFIG, CleanConfig),
     {ok, #{pid => queue_ctrl_start(Config#{counters => Counters})}}.
-
-check_config(_Name, _SetOrUpdate, _OldHConfig, NewHConfig0) ->
-    {ok, NewHConfig0}.
 
 config_changed(_Name, NewHConfig, #{pid := Pid} = State) ->
     call(Pid, {config_changed, NewHConfig}),
@@ -146,6 +149,27 @@ handle_info(_, _, State) ->
 
 terminate(_Name, _Reason, _State) ->
     ok.
+
+% %--- Log Filtering Functions ---------------------------------------------------
+
+filter_out(LogEvent = #{meta := Meta}, Mfa = {M, F, A})
+  when is_atom(M), is_atom(F), is_integer(A) ->
+    case Meta of
+        #{mfa := Mfa} -> stop;
+        _ -> LogEvent
+    end;
+filter_out(LogEvent = #{meta := Meta}, {M, F})
+  when is_atom(M), is_atom(F) ->
+    case Meta of
+        #{mfa := {M, F, _}} -> stop;
+        _ -> LogEvent
+    end;
+filter_out(LogEvent = #{meta := Meta}, M)
+  when is_atom(M) ->
+    case Meta of
+        #{mfa := {M, _, _}} -> stop;
+        _ -> LogEvent
+    end.
 
 %--- Internal ------------------------------------------------------------------
 

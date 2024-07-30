@@ -40,7 +40,6 @@ end_per_suite(Config) ->
 
 init_per_testcase(TestCase, Config) ->
     {ok, _} = application:ensure_all_started(grisp_emulation),
-    application:set_env(grisp_connect, test_cert_dir, ?config(cert_dir, Config)),
     {ok, _} = application:ensure_all_started(grisp_connect),
     case TestCase of
         auto_connect_test -> ok;

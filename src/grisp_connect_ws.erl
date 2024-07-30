@@ -51,7 +51,13 @@ handle_call(is_connected, _, #state{ws_up = Up} = S) ->
     {reply, Up, S}.
 
 handle_cast({connect, Server, Port}, #state{gun_pid = undefined} = S) ->
-    case grisp_connect_tls:connect(Server, Port) of
+    GunOpts = #{
+        protocols => [http],
+        transport => tls,
+        retry => 0,
+        tls_opts => grisp_cryptoauth_tls:options(Server)
+    },
+    case gun:open(Server, Port, GunOpts) of
         {ok, GunPid} ->
             GunRef = monitor(process, GunPid),
             {noreply, #state{gun_pid = GunPid, gun_ref = GunRef}};
@@ -99,6 +105,10 @@ handle_info({gun_ws, Pid, Stream, {close, Code, Message}},
             #state{gun_pid = Pid, ws_stream = Stream} = S) ->
     ?LOG_WARNING(#{event => stream_closed, code => Code, reason => Message}),
     {noreply, S};
+handle_info({gun_error, Pid, _Stream, Reason}, #state{gun_pid = Pid} = S) ->
+    ?LOG_ERROR(#{event => ws_closed, reason => Reason}),
+    grisp_connect_client:disconnected(),
+    {noreply, shutdown_gun(S)};
 handle_info({gun_down, Pid, ws, closed, [Stream]}, #state{gun_pid = Pid, ws_stream = Stream} = S) ->
     ?LOG_WARNING(#{event => ws_closed}),
     grisp_connect_client:disconnected(),

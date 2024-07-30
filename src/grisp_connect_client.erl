@@ -87,7 +87,7 @@ waiting_ip(state_timeout, retry, Data) ->
             ?LOG_INFO(#{event => checked_ip, ip => IP}),
             {next_state, connecting, Data};
         invalid ->
-            ?LOG_INFO(#{event => waiting_ip}),
+            ?LOG_DEBUG(#{event => waiting_ip}),
             {next_state, waiting_ip, Data, [{state_timeout, ?STD_TIMEOUT, retry}]}
     end;
 ?HANDLE_COMMON.
@@ -104,7 +104,7 @@ connecting(state_timeout, wait, Data) ->
             ?LOG_NOTICE(#{event => connected}),
             {next_state, connected, Data};
         false ->
-            ?LOG_INFO(#{event => waiting_ws_connection}),
+            ?LOG_DEBUG(#{event => waiting_ws_connection}),
             {keep_state_and_data, [{state_timeout, ?STD_TIMEOUT, wait}]}
     end;
 connecting(cast, disconnected, _Data) ->
@@ -147,7 +147,7 @@ connected({call, From}, {request, Method, Type, Params},
 handle_common(cast, connect, State, _Data) when State =/= idle ->
     keep_state_and_data;
 handle_common({call, From}, is_connected, State, _) when State =/= connected ->
-        {keep_state_and_data, [{reply, From, false}]};
+    {keep_state_and_data, [{reply, From, false}]};
 handle_common({call, From}, {request, _, _, _}, State, _Data)
 when State =/= connected ->
     {keep_state_and_data, [{reply, From, {error, disconnected}}]};

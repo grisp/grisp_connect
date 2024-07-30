@@ -9,12 +9,11 @@
         stdlib,
         grisp,
         grisp_cryptoauth,
-        certifi,
         gun,
         jsx
     ]},
     {optional_applications, [
-        grisp_cryptoauth
+        grisp_updater_grisp2
     ]},
     {env, [
         {domain, "devices.grisp.io"},
@@ -31,7 +30,16 @@
           {handler,
            grisp_connect_log_handler,
            grisp_connect_logger_bin,
-           #{formatter => {grisp_connect_logger_bin, #{}}}}
+           #{formatter => {grisp_connect_logger_bin, #{}},
+             % Filter out supervisor progress reports to prevent the ones
+             % from tls_dyn_connection_sup that logs all the certificates
+             % to crash the connection...
+             filters => [
+                {filter_out_progress,
+                  {fun grisp_connect_logger_bin:filter_out/2,
+                    {supervisor, report_progress}}}
+             ]
+           }}
         ]}
     ]},
     {modules, []},

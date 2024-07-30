@@ -76,3 +76,43 @@ You can copy paste these settings. Here we both swap the default logger handler 
     ]}
 ].
 ```
+
+## Local Development
+
+Add an entry in your local hosts file so the domain www.seawater.local points
+to your local development server.
+
+Start a local development shell:
+
+    rebar3 as local shell
+
+Run tests:
+
+    rebar3 ct
+
+
+## Development on GRiSP Hardware
+
+Add an entry in the grisp hosts file so the domain www.seawater.local points
+to your local development server.
+
+e.g. using `ifconfig` command (MacOS and older linux):
+
+    echo "$(ifconfig | grep 'inet ' | grep -v 127.0.0.1 | awk '{ print $2 }' | head -n 1) www.seawater.local" >> grisp/default/common/deploy/files/etc/hosts
+]
+e.g. using `ip` command (Newer linux):
+
+    echo "$(ip addr show | grep 'inet ' | grep -v 127.0.0.1 | awk '{print $2}' | cut -d/ -f1 | head -n 1) www.seawater.local" >> grisp/default/common/deploy/files/etc/hosts
+
+To deploy the release, configure rebar3_grisp's deploy configuration in
+rebar.config and then run:
+
+    rebar3 as dev grisp deploy
+
+
+## Production on GRiSP Hardware
+
+To deploy on GRiSP hardware for production, configure rebar3_grisp's deploy
+configuration in rebar.config and then run:
+
+    rebar3 as prod grisp deploy

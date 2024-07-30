@@ -42,7 +42,6 @@ init_per_testcase(log_level_test, Config) ->
     init_per_testcase(other, [{default_level, Level} | Config]);
 init_per_testcase(_, Config) ->
     {ok, _} = application:ensure_all_started(grisp_emulation),
-    application:set_env(grisp_connect, test_cert_dir, ?config(cert_dir, Config)),
     {ok, _} = application:ensure_all_started(grisp_connect),
     ok = wait_connection(),
     ct:sleep(1000),

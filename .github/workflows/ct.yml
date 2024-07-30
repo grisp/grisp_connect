@@ -27,7 +27,7 @@ jobs:
         run: |
           eval `ssh-agent -s`
           ssh-add - <<< '${{ secrets.STRITZINGER_BOT_SSH_KEY }}'
-          rebar3 compile
+          rebar3 as test compile
       - name: Run ct
         run: |
           eval `ssh-agent -s`
