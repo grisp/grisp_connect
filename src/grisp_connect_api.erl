@@ -39,6 +39,20 @@ handle_rpc_messages([{internal_error, _, _} = E | Batch], Replies) ->
     handle_rpc_messages(Batch,
                         [grisp_connect_jsonrpc:format_error(E)| Replies]).
 
+handle_request(<<"post">>, #{type := <<"start_update">>} = Params, ID) ->
+    URL = maps:get(url, Params, 1),
+    case start_update(URL) of
+        % TODO: start_update error cast
+        {error, update_unavailable} -> {error,
+                                        -564095940, 
+                                        <<"grisp_updater unavailable">>, 
+                                        undefined, 
+                                        ID};
+        {error, Reason} -> {error, 
+                            -32603, 
+                            iolist_to_binary(io_lib:format("~p", [Reason])), ID};
+        ok -> {result, undefined, ID}
+    end;
 handle_request(<<"post">>, #{type := <<"flash">>} = Params, ID) ->
     Led = maps:get(led, Params, 1),
     Color = maps:get(color, Params, red),
@@ -63,6 +77,21 @@ flash(Led, Color) ->
         grisp_led:off(Led)
     end),
     ok.
+
+start_update(URL) ->
+    case is_running(grisp_updater) of
+        true -> grisp_updater:start_update(URL, 
+                                           grisp_conntect_updater_progress,
+                                           #{client => self()}, #{});
+        false -> {error, update_unavailable}
+    end.
+
+is_running(AppName) ->
+    Apps = application:which_applications(),
+    case [App || {App, _Desc, _VSN} <- Apps, App =:= AppName] of
+        [] -> false;
+        [_] -> true
+    end.
 
 error_atom(-1) -> device_not_linked;
 error_atom(-2) -> token_expired;
