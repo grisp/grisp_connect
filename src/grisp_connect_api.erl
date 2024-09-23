@@ -8,12 +8,23 @@
 
 %--- API -----------------------------------------------------------------------
 
+% #doc Assembles a jsonrpc request and its uuid
+-spec request(Method :: atom() | binary(),
+              Type :: atom() | binary(),
+              Params :: map()) -> {ID :: binary(), Encoded :: binary()}.
 request(Method, Type, Params) ->
     ID = id(),
     Rpc = {request, Method, maps:put(type, Type, Params), ID},
     Encoded = grisp_connect_jsonrpc:encode(Rpc),
     {ID, Encoded}.
 
+% @doc Indentifies if the message is a request or a reply to a previous request.
+% In case it was a request, returns the reply to be sent to the peer.
+% In case it was a response, returns the parsed ID and content to be handled by
+% the caller.
+-spec handle_msg(JSON :: binary()) ->
+    {request, Response :: binary()} |
+    {response, ID :: binary(), {ok, Result :: map()} | {error, atom()}}.
 handle_msg(JSON) ->
     JSON_RPC = grisp_connect_jsonrpc:decode(JSON),
     handle_jsonrpc(JSON_RPC).
@@ -41,24 +52,26 @@ handle_rpc_messages([{internal_error, _, _} = E | Batch], Replies) ->
 
 handle_request(<<"post">>, #{type := <<"start_update">>} = Params, ID) ->
     URL = maps:get(url, Params, 1),
-    case start_update(URL) of
+    Reply = case start_update(URL) of
         % TODO: start_update error cast
-        {error, update_unavailable} -> {error,
-                                        -564095940, 
-                                        <<"grisp_updater unavailable">>, 
-                                        undefined, 
-                                        ID};
-        {error, Reason} -> {error, 
-                            -32603, 
-                            iolist_to_binary(io_lib:format("~p", [Reason])), ID};
-        ok -> {result, undefined, ID}
-    end;
+        {error, update_unavailable} ->
+            {error, -564095940, <<"grisp_updater unavailable">>, undefined, ID};
+        {error, Reason} ->
+            ReasonText = iolist_to_binary(io_lib:format("~p", [Reason])),
+            grisp_connect_jsonrpc:format_error({internal_error, Reason, ID});
+        ok ->
+            {result, ok, ID}
+    end,
+    {request, grisp_connect_jsonrpc:encode(Reply)};
 handle_request(<<"post">>, #{type := <<"flash">>} = Params, ID) ->
     Led = maps:get(led, Params, 1),
     Color = maps:get(color, Params, red),
-    {result, flash(Led, Color), ID};
+    Reply = {result, flash(Led, Color), ID},
+    {request,  grisp_connect_jsonrpc:encode(Reply)};
 handle_request(_, _, ID) ->
-    grisp_connect_jsonrpc:format_error({internal_error, method_not_found, ID}).
+    Error = {internal_error, method_not_found, ID},
+    FormattedError = grisp_connect_jsonrpc:format_error(),
+    grisp_connect_jsonrpc:encode(FormattedError).
 
 handle_response(Response) ->
     {ID, Reply} = case Response of
@@ -80,7 +93,7 @@ flash(Led, Color) ->
 
 start_update(URL) ->
     case is_running(grisp_updater) of
-        true -> grisp_updater:start_update(URL, 
+        true -> grisp_updater:start_update(URL,
                                            grisp_conntect_updater_progress,
                                            #{client => self()}, #{});
         false -> {error, update_unavailable}
