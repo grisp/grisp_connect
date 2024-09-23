@@ -47,8 +47,8 @@ format_error({internal_error, method_not_found, ID}) ->
     {error, -32601, <<"Method not found">>, undefined, ID};
 format_error({internal_error, invalid_params, ID}) ->
     {error, -32602, <<"Invalid params">>, undefined, ID};
-format_error({internal_error, internal_error, ID}) ->
-    {error, -32603, <<"Internal error">>, undefined, ID}.
+format_error({internal_error, Reason, ID}) ->
+    {error, -32603, <<"Internal error">>, Reason, ID}.
 
 %--- Internal -----------------------------------------------------------------
 
