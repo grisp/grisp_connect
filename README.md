@@ -20,8 +20,9 @@ Table of content
     - [`ws_ping_timeout`](#ws_ping_timeout)
     - [`logs_interval`](#logs_interval)
     - [`logs_batch_size`](#logs_batch_size)
+    - [Custom TLS options](#custom-tls-options)
 - [See all Logs on GRiSP.io](#see-all-logs-on-grispio)
-  - [Custom TLS options](#custom-tls-options)
+- [Development](#development)
   - [Local Development](#local-development)
   - [Development on GRiSP Hardware](#development-on-grisp-hardware)
   - [Production on GRiSP Hardware](#production-on-grisp-hardware)
@@ -130,6 +131,22 @@ Sets the intervall between each log batch dispatch to grisp.io.
 
 Accepts an integer that represents the maximum number of logs that can be batched together, default value is `100`.
 
+### Custom TLS options
+
+TLS settings are managed through the [grisp_cryptoauth TLS options](https://github.com/grisp/grisp_cryptoauth?tab=readme-ov-file#configuring-tls-options).
+
+grisp_connect sets the following options as default values if no `tls_server_trusted_certs_cb` is setup. Refer to the `grisp_cryptoauth` README in case you want to overrride the default `certifi` CAs.
+
+```erlang
+    % Example sys.config
+    [
+        ...
+        {grisp_cryptoauth, [
+            {tls_server_trusted_certs_cb, {certifi, cacerts, []}}
+        ]}
+    ]
+```
+
 # See all Logs on GRiSP.io
 
 Once this app is started, it forwards all logs to GRiSP.io without the need of setting up anything. The only logs that we do not catch are the ones generated before `grisp_connect` boots.
@@ -164,21 +181,9 @@ You can copy paste these settings. Here we both swap the default logger handler 
     ]}
 ].
 ```
-## Custom TLS options
 
-TLS settings are managed through the [grisp_cryptoauth](https://github.com/grisp/grisp_cryptoauth?tab=readme-ov-file#configuring-tls-options) TLS options.
+# Development
 
-grisp_connect sets the folowing options as default values if no `tls_server_trusted_certs_cb` is setup.
-
-```erlang
-    % sys.config
-    [
-        ...
-        {grisp_cryptoauth, [
-            {tls_server_trusted_certs_cb, {certifi, cacerts, []}}
-        ]}
-    ]
-```
 ## Local Development
 
 Add an entry in your local hosts file so the domain www.seawater.local points
@@ -191,7 +196,6 @@ Start a local development shell:
 Run tests:
 
     rebar3 ct
-
 
 ## Development on GRiSP Hardware
 
