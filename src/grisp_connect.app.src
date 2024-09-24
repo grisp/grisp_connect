@@ -10,7 +10,8 @@
         grisp,
         grisp_cryptoauth,
         gun,
-        jsx
+        jsx,
+        certifi
     ]},
     {optional_applications, [
         grisp_updater_grisp2
