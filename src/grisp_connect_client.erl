@@ -121,15 +121,15 @@ connected(cast, disconnected, Data) ->
     grisp_connect_log_server:stop(),
     {next_state, waiting_ip, Data};
 connected(cast, {handle_message, Payload}, #data{requests = Requests} = Data) ->
-    Replies = grisp_connect_api:handle_msg(Payload),
+    Responses = grisp_connect_api:handle_msg(Payload),
     % A reduce operation is needed to support jsonrpc batch comunications
-    case Replies of
+    case Responses of
         [] ->
             keep_state_and_data;
-        [{request, Response}] -> % Response for a GRiSP.io request
+        [{send_response, Response}] -> % Response for a GRiSP.io request
             grisp_connect_ws:send(Response),
             keep_state_and_data;
-        [{response, ID, Response}] -> % GRiSP.io response
+        [{handle_response, ID, Response}] -> % handle a GRiSP.io response
             {OtherRequests, Actions} = dispatch_response(ID, Response, Requests),
             {keep_state, Data#data{requests = OtherRequests}, Actions}
     end;

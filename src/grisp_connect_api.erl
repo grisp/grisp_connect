@@ -23,8 +23,8 @@ request(Method, Type, Params) ->
 % In case it was a response, returns the parsed ID and content to be handled by
 % the caller.
 -spec handle_msg(JSON :: binary()) ->
-    {request, Response :: binary()} |
-    {response, ID :: binary(), {ok, Result :: map()} | {error, atom()}}.
+    {send_response, Response :: binary()} |
+    {handle_response, ID :: binary(), {ok, Result :: map()} | {error, atom()}}.
 handle_msg(JSON) ->
     JSON_RPC = grisp_connect_jsonrpc:decode(JSON),
     handle_jsonrpc(JSON_RPC).
@@ -62,12 +62,12 @@ handle_request(<<"post">>, #{type := <<"start_update">>} = Params, ID) ->
         ok ->
             {result, ok, ID}
     end,
-    {request, grisp_connect_jsonrpc:encode(Reply)};
+    {send_response, grisp_connect_jsonrpc:encode(Reply)};
 handle_request(<<"post">>, #{type := <<"flash">>} = Params, ID) ->
     Led = maps:get(led, Params, 1),
     Color = maps:get(color, Params, red),
     Reply = {result, flash(Led, Color), ID},
-    {request,  grisp_connect_jsonrpc:encode(Reply)};
+    {send_response,  grisp_connect_jsonrpc:encode(Reply)};
 handle_request(_, _, ID) ->
     Error = {internal_error, method_not_found, ID},
     FormattedError = grisp_connect_jsonrpc:format_error(),
@@ -80,7 +80,7 @@ handle_response(Response) ->
         {error, Code, _Message, _Data, ID0} ->
             {ID0, {error, error_atom(Code)}}
     end,
-    {response, ID, Reply}.
+    {handle_response, ID, Reply}.
 
 flash(Led, Color) ->
     spawn(fun() ->
