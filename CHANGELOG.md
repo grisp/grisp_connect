@@ -8,7 +8,7 @@ and this project adheres to
 
 ## [Unreleased]
 
-## [1.0.0] - 2024-05-10
+## [1.0.0] - 2024-09-24
 
 ### What's Changed
 
@@ -25,4 +25,4 @@ and this project adheres to
 **Full Changelog**: https://github.com/grisp/grisp_connect/commits/1.0.0
 
 [Unreleased]: https://github.com/grisp/grisp_connect/compare/1.0.0...HEAD
-[1.0.0]: https://github.com/grisp/grisp_connect/release/tag/1.0.0
+[1.0.0]: https://github.com/grisp/grisp_connect/compare/6b59d16383b3e5154ef839bcf5c77a6b770aada5...1.0.0
