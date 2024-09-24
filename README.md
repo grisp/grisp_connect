@@ -2,18 +2,19 @@
 
 GRiSP.io Client Library for GRiSP
 
-Table of content
+## Table of content
 
 - [grisp\_connect](#grisp_connect)
-- [Usage](#usage)
-  - [Option 1. Use the `rebar3_grisp` plugin](#option-1-use-the-rebar3_grisp-plugin)
-  - [Option 2. Add `grisp_connect` Manually to your Application](#option-2-add-grisp_connect-manually-to-your-application)
-- [Further Steps](#further-steps)
-  - [Check whether the board is connected](#check-whether-the-board-is-connected)
-  - [Link your Device to your GRiSP.io Account](#link-your-device-to-your-grispio-account)
+  - [Table of content](#table-of-content)
+  - [Usage](#usage)
+    - [Option 1. Use the `rebar3_grisp` plugin](#option-1-use-the-rebar3_grisp-plugin)
+    - [Option 2. Add `grisp_connect` Manually to your Application](#option-2-add-grisp_connect-manually-to-your-application)
+  - [Further Steps](#further-steps)
+    - [Check whether the board is connected](#check-whether-the-board-is-connected)
+    - [Link your Device to your GRiSP.io Account](#link-your-device-to-your-grispio-account)
     - [Troubleshooting:](#troubleshooting)
     - [Need to Unlink a Device?](#need-to-unlink-a-device)
-- [Environment Options](#environment-options)
+  - [Environment Options](#environment-options)
     - [`connect`](#connect)
     - [`ntp`](#ntp)
     - [`ws_request_timeout`](#ws_request_timeout)
@@ -21,23 +22,23 @@ Table of content
     - [`logs_interval`](#logs_interval)
     - [`logs_batch_size`](#logs_batch_size)
     - [Custom TLS options](#custom-tls-options)
-- [See all Logs on GRiSP.io](#see-all-logs-on-grispio)
-- [Development](#development)
-  - [Local Development](#local-development)
-  - [Development on GRiSP Hardware](#development-on-grisp-hardware)
-  - [Production on GRiSP Hardware](#production-on-grisp-hardware)
+  - [See all Logs on GRiSP.io](#see-all-logs-on-grispio)
+  - [Development](#development)
+    - [Local Development](#local-development)
+    - [Development on GRiSP Hardware](#development-on-grisp-hardware)
+    - [Production on GRiSP Hardware](#production-on-grisp-hardware)
 
 
 Add this application as a dependency in your GRiSP2 project.
 Your board will connect securely using mTLS to the [GRiSP.io](https://grisp.io) services.
 
-# Usage
+## Usage
 
-## Option 1. Use the `rebar3_grisp` plugin
+### Option 1. Use the `rebar3_grisp` plugin
 
 The `configure` method of the `rebar3_grisp` version >= 2.6.0 will add `grisp_connect` with the needed configurations to your GRiSP application. See [GRiSP Wiki/Use-your-GRiSP-2-board-with-GRiSP.io](https://github.com/grisp/grisp/wiki/Use-your-GRiSP-2-board-with-GRiSP.io).
 
-## Option 2. Add `grisp_connect` Manually to your Application
+### Option 2. Add `grisp_connect` Manually to your Application
 
 Add
 
@@ -59,9 +60,9 @@ You can find your device linking token on [GRiSP.io/grisp_manager](https://grisp
 
 You can also skip this configuration and insert the token manually later.
 
-# Further Steps
+## Further Steps
 
-## Check whether the board is connected
+### Check whether the board is connected
 
 ```erlang
 > grisp_connect:is_connected().
@@ -70,7 +71,7 @@ true
 {ok,<<"pong">>}
 ```
 
-## Link your Device to your GRiSP.io Account
+### Link your Device to your GRiSP.io Account
 
 ```erlang
 > grisp_connect:link_device(<<"...">>).
@@ -100,7 +101,7 @@ We currently do not expose a public API to unlink a Device. Please reach out to 
 
 If you encounter any problems or have questions, don't hesitate to contact [support](mailto:grisp@stritzinger.com). Happy coding!
 
-# Environment Options
+## Environment Options
 
 ### `connect`
 
@@ -147,7 +148,7 @@ grisp_connect sets the following options as default values if no `tls_server_tru
     ]
 ```
 
-# See all Logs on GRiSP.io
+## See all Logs on GRiSP.io
 
 Once this app is started, it forwards all logs to GRiSP.io without the need of setting up anything. The only logs that we do not catch are the ones generated before `grisp_connect` boots.
 If you want to see ALL logs, even from applications that boot before `grisp_connect`, you need to disable the default logger handler and set the grisp_connect handler as the default one. This involves changing the `kernel` and `grisp_connect` app configuration settings in your sys.config file.
@@ -182,9 +183,9 @@ You can copy paste these settings. Here we both swap the default logger handler 
 ].
 ```
 
-# Development
+## Development
 
-## Local Development
+### Local Development
 
 Add an entry in your local hosts file so the domain www.seawater.local points
 to your local development server.
@@ -197,7 +198,7 @@ Run tests:
 
     rebar3 ct
 
-## Development on GRiSP Hardware
+### Development on GRiSP Hardware
 
 Add an entry in the grisp hosts file so the domain www.seawater.local points
 to your local development server.
@@ -215,8 +216,7 @@ rebar.config and then run:
 
     rebar3 as dev grisp deploy
 
-
-## Production on GRiSP Hardware
+### Production on GRiSP Hardware
 
 To deploy on GRiSP hardware for production, configure rebar3_grisp's deploy
 configuration in rebar.config and then run:
