@@ -76,7 +76,21 @@ You can copy paste these settings. Here we both swap the default logger handler 
     ]}
 ].
 ```
+## Custom TLS options
 
+TLS settings are managed through the [grisp_cryptoauth](https://github.com/grisp/grisp_cryptoauth?tab=readme-ov-file#configuring-tls-options) TLS options.
+
+grisp_connect sets the folowing options as default values if no `tls_server_trusted_certs_cb` is setup.
+
+```erlang
+    % sys.config
+    [
+        ...
+        {grisp_cryptoauth, [
+            {tls_server_trusted_certs_cb, {certifi, cacerts, []}}
+        ]}
+    ]
+```
 ## Local Development
 
 Add an entry in your local hosts file so the domain www.seawater.local points
