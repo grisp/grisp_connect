@@ -1,4 +1,4 @@
-%% @doc Librabry module containing the jsonrpc API logic
+%% @doc Library module containing the jsonrpc API logic
 -module(grisp_connect_api).
 
 -export([request/3]).
@@ -51,18 +51,23 @@ handle_rpc_messages([{internal_error, _, _} = E | Batch], Replies) ->
                         [grisp_connect_jsonrpc:format_error(E)| Replies]).
 
 handle_request(<<"post">>, #{type := <<"start_update">>} = Params, ID) ->
-    URL = maps:get(url, Params, 1),
-    Reply = case start_update(URL) of
-        % TODO: start_update error cast
-        {error, update_unavailable} ->
-            {error, -564095940, <<"grisp_updater unavailable">>, undefined, ID};
-        {error, Reason} ->
-            ReasonText = iolist_to_binary(io_lib:format("~p", [Reason])),
-            grisp_connect_jsonrpc:format_error({internal_error, Reason, ID});
-        ok ->
-            {result, ok, ID}
-    end,
-    {send_response, grisp_connect_jsonrpc:encode(Reply)};
+    try 
+        URL = maps:get(url, Params, undefined),
+        Reply = case start_update(URL) of
+            {error, grisp_updater_unavailable} ->
+                {error, -10, grisp_updater_unavailable, undefined, ID};
+            {error, Reason} ->
+                ReasonBinary = iolist_to_binary(io_lib:format("~p", [Reason])),
+                grisp_connect_jsonrpc:format_error({internal_error, ReasonBinary, ID});
+            ok ->
+                {result, ok, ID}
+        end,
+        {request, grisp_connect_jsonrpc:encode(Reply)}
+    catch
+        throw:invalid_params ->
+            {request, 
+             grisp_connect_jsonrpc:format_error({internal_error, invalid_params, ID})}
+        end;
 handle_request(<<"post">>, #{type := <<"flash">>} = Params, ID) ->
     Led = maps:get(led, Params, 1),
     Color = maps:get(color, Params, red),
@@ -70,7 +75,7 @@ handle_request(<<"post">>, #{type := <<"flash">>} = Params, ID) ->
     {send_response,  grisp_connect_jsonrpc:encode(Reply)};
 handle_request(_, _, ID) ->
     Error = {internal_error, method_not_found, ID},
-    FormattedError = grisp_connect_jsonrpc:format_error(),
+    FormattedError = grisp_connect_jsonrpc:format_error(Error),
     grisp_connect_jsonrpc:encode(FormattedError).
 
 handle_response(Response) ->
@@ -93,10 +98,10 @@ flash(Led, Color) ->
 
 start_update(URL) ->
     case is_running(grisp_updater) of
-        true -> grisp_updater:start_update(URL,
-                                           grisp_conntect_updater_progress,
-                                           #{client => self()}, #{});
-        false -> {error, update_unavailable}
+        true -> grisp_updater:start(URL,
+                                    grisp_conntect_updater_progress,
+                                    #{client => self()}, #{});
+        false -> {error, grisp_updater_unavailable}
     end.
 
 is_running(AppName) ->
@@ -106,11 +111,12 @@ is_running(AppName) ->
         [_] -> true
     end.
 
-error_atom(-1) -> device_not_linked;
-error_atom(-2) -> token_expired;
-error_atom(-3) -> device_already_linked;
-error_atom(-4) -> invalid_token;
-error_atom(_)  -> jsonrpc_error.
+error_atom(-1)  -> device_not_linked;
+error_atom(-2)  -> token_expired;
+error_atom(-3)  -> device_already_linked;
+error_atom(-4)  -> invalid_token;
+error_atom(-10) -> grisp_updater_unavailable;
+error_atom(_)   -> jsonrpc_error.
 
 id() ->
     list_to_binary(integer_to_list(erlang:unique_integer())).
