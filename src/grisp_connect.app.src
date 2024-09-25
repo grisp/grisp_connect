@@ -44,5 +44,18 @@
         ]}
     ]},
     {modules, []},
-    {links, []}
+    {links, [
+      {"Homepage", "https://www.grisp.io"},
+      {"Changelog", "https://github.com/grisp/grisp_connect/blob/main/CHANGELOG.md"},
+      {"GitHub", "https://github.com/grisp/grisp_connect"}
+    ]},
+    {files, [
+      "LICENSE",
+      "README.md",
+      "rebar.*",
+      "include",
+      "src",
+      "grisp"
+    ]},
+    {licenses, ["Apache-2.0"]}
 ]}.
