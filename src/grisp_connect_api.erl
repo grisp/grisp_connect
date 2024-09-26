@@ -93,9 +93,9 @@ flash(Led, Color) ->
 
 start_update(URL) ->
     case is_running(grisp_updater) of
-        true -> grisp_updater:start_update(URL,
-                                           grisp_conntect_updater_progress,
-                                           #{client => self()}, #{});
+        true -> grisp_updater:start(URL,
+                                    grisp_connect_updater_progress,
+                                    #{client => self()}, #{});
         false -> {error, update_unavailable}
     end.
 
