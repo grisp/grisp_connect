@@ -110,8 +110,6 @@ start_update(URL) ->
         true -> grisp_updater:start(URL,
                                     grisp_connect_updater_progress,
                                     #{client => self()}, #{});
-                                    grisp_conntect_updater_progress,
-                                    #{client => self()}, #{});
         false -> {error, grisp_updater_unavailable}
     end.
 
