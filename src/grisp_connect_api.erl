@@ -1,10 +1,16 @@
-%% @doc Librabry module containing the jsonrpc API logic
+%% @doc Library module containing the jsonrpc API logic
 -module(grisp_connect_api).
 
 -export([request/3]).
 -export([handle_msg/1]).
 
 -include_lib("kernel/include/logger.hrl").
+
+%--- Macros --------------------------------------------------------------------
+-define(method_get, <<"get">>).
+-define(method_post, <<"post">>).
+-define(method_patch, <<"patch">>).
+-define(method_delete, <<"delete">>).
 
 %--- API -----------------------------------------------------------------------
 
@@ -38,7 +44,7 @@ handle_jsonrpc({single, Rpc}) ->
 
 handle_rpc_messages([], Replies) -> lists:reverse(Replies);
 handle_rpc_messages([{request, M, Params, ID} | Batch], Replies)
-when M == <<"post">> ->
+  when M == ?method_post ->
     handle_rpc_messages(Batch, [handle_request(M, Params, ID) | Replies]);
 handle_rpc_messages([{result, _, _} = Res| Batch], Replies) ->
     handle_rpc_messages(Batch, [handle_response(Res)| Replies]);
@@ -50,27 +56,35 @@ handle_rpc_messages([{internal_error, _, _} = E | Batch], Replies) ->
     handle_rpc_messages(Batch,
                         [grisp_connect_jsonrpc:format_error(E)| Replies]).
 
-handle_request(<<"post">>, #{type := <<"start_update">>} = Params, ID) ->
-    URL = maps:get(url, Params, 1),
-    Reply = case start_update(URL) of
-        % TODO: start_update error cast
-        {error, update_unavailable} ->
-            {error, -564095940, <<"grisp_updater unavailable">>, undefined, ID};
-        {error, Reason} ->
-            ReasonText = iolist_to_binary(io_lib:format("~p", [Reason])),
-            grisp_connect_jsonrpc:format_error({internal_error, Reason, ID});
-        ok ->
-            {result, ok, ID}
-    end,
-    {send_response, grisp_connect_jsonrpc:encode(Reply)};
-handle_request(<<"post">>, #{type := <<"flash">>} = Params, ID) ->
+handle_request(?method_post, #{type := <<"start_update">>} = Params, ID) ->
+    try 
+        URL = maps:get(url, Params),
+        Reply = case start_update(URL) of
+            {error, grisp_updater_unavailable} ->
+                {error, -10, grisp_updater_unavailable, undefined, ID};
+            {error, already_updating} ->
+                {error, -11, already_updating, undefined, ID};
+            {error, Reason} ->
+                ReasonBinary = iolist_to_binary(io_lib:format("~p", [Reason])),
+                grisp_connect_jsonrpc:format_error({internal_error, ReasonBinary, ID});
+            ok ->
+                {result, ok, ID}
+        end,
+        {request, grisp_connect_jsonrpc:encode(Reply)}
+    catch
+        throw:bad_key ->
+            {request, 
+             grisp_connect_jsonrpc:format_error(
+                {internal_error, invalid_params, ID})}
+        end;
+handle_request(?method_post, #{type := <<"flash">>} = Params, ID) ->
     Led = maps:get(led, Params, 1),
     Color = maps:get(color, Params, red),
     Reply = {result, flash(Led, Color), ID},
     {send_response,  grisp_connect_jsonrpc:encode(Reply)};
 handle_request(_, _, ID) ->
     Error = {internal_error, method_not_found, ID},
-    FormattedError = grisp_connect_jsonrpc:format_error(),
+    FormattedError = grisp_connect_jsonrpc:format_error(Error),
     grisp_connect_jsonrpc:encode(FormattedError).
 
 handle_response(Response) ->
@@ -96,7 +110,9 @@ start_update(URL) ->
         true -> grisp_updater:start(URL,
                                     grisp_connect_updater_progress,
                                     #{client => self()}, #{});
-        false -> {error, update_unavailable}
+                                    grisp_conntect_updater_progress,
+                                    #{client => self()}, #{});
+        false -> {error, grisp_updater_unavailable}
     end.
 
 is_running(AppName) ->
@@ -106,11 +122,13 @@ is_running(AppName) ->
         [_] -> true
     end.
 
-error_atom(-1) -> device_not_linked;
-error_atom(-2) -> token_expired;
-error_atom(-3) -> device_already_linked;
-error_atom(-4) -> invalid_token;
-error_atom(_)  -> jsonrpc_error.
+error_atom(-1)  -> device_not_linked;
+error_atom(-2)  -> token_expired;
+error_atom(-3)  -> device_already_linked;
+error_atom(-4)  -> invalid_token;
+error_atom(-10) -> grisp_updater_unavailable;
+error_atom(-11) -> already_updating;
+error_atom(_)   -> jsonrpc_error.
 
 id() ->
     list_to_binary(integer_to_list(erlang:unique_integer())).
