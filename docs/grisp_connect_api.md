@@ -29,7 +29,8 @@ We use [jsonrpc](https://www.jsonrpc.org) 2.0 between frontend and backend.
 
 | Error Content                                            | When it Happens                                   |
 | -------------------------------------------------------- | ------------------------------------------------- |
-| `{code: -32001, message: "grisp_updater unavailable"}`   | When the grisp_updater application is not running |
+| `{code: -10, message: "grisp_updater unavailable"}`      | Grisp updater app is not running                  |
+| `{code: -11, message: "already updating "}`              | An update is already happening                    |
 
 </p>
 </details>
