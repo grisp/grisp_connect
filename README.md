@@ -1,6 +1,12 @@
 # grisp_connect
 
-GRiSP.io Client Library for GRiSP
+GRiSP.io Client Library for GRiSP. This library enables secure communication
+ between your GRiSP2 board and the [GRiSP.io](https://grisp.io) services using
+ Mutual TLS (mTLS). To get started, add this application as a dependency in your
+ GRiSP2 project.
+
+⚠️ **Note:** If you plan to use the API calls related to `grisp_updater`, make
+ sure to add `grisp_updater` as a dependency in your project as well.
 
 ## Table of content
 
@@ -27,10 +33,6 @@ GRiSP.io Client Library for GRiSP
     - [Local Development](#local-development)
     - [Development on GRiSP Hardware](#development-on-grisp-hardware)
     - [Production on GRiSP Hardware](#production-on-grisp-hardware)
-
-
-Add this application as a dependency in your GRiSP2 project.
-Your board will connect securely using mTLS to the [GRiSP.io](https://grisp.io) services.
 
 ## Usage
 
