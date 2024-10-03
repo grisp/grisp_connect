@@ -7,6 +7,7 @@
   - [Error Codes](#error-codes)
     - [Default error codes](#default-error-codes)
     - [Custom error codes](#custom-error-codes)
+  - [Notifications](#notifications)
 
 We use [jsonrpc](https://www.jsonrpc.org) 2.0 between frontend and backend.
 
@@ -71,3 +72,14 @@ Additionally to the default jsonrpc error codes the following codes will be retu
 | -2    | `"token expired"`         | token is expired                          |
 | -3    | `"device already linked"` | device needs to be unlinked first via UI  |
 | -4    | `"invalid token"`         | token is e.g. not orderly encoded         |
+
+## Notifications
+
+<details><summary><i>Notify - Status Update </i></summary>
+
+**`result`**:  `JSON Object`
+
+| key            | value             | description                       |
+| -------------- | ----------------- | --------------------------------- |
+| `"type"`       | `"status_update"` | Type of notification              |
+| `"percentage"` | integer           | Progress percentage of the update |

@@ -11,6 +11,7 @@
 -define(method_post, <<"post">>).
 -define(method_patch, <<"patch">>).
 -define(method_delete, <<"delete">>).
+-define(method_notify, <<"notify">>).
 
 %--- API -----------------------------------------------------------------------
 
@@ -56,6 +57,11 @@ handle_rpc_messages([{internal_error, _, _} = E | Batch], Replies) ->
     handle_rpc_messages(Batch,
                         [grisp_connect_jsonrpc:format_error(E)| Replies]).
 
+handle_request(?method_post, #{type := <<"flash">>} = Params, ID) ->
+    Led = maps:get(led, Params, 1),
+    Color = maps:get(color, Params, red),
+    Reply = {result, flash(Led, Color), ID},
+    {send_response,  grisp_connect_jsonrpc:encode(Reply)};
 handle_request(?method_post, #{type := <<"start_update">>} = Params, ID) ->
     try
         URL = maps:get(url, Params),
@@ -77,10 +83,16 @@ handle_request(?method_post, #{type := <<"start_update">>} = Params, ID) ->
              grisp_connect_jsonrpc:format_error(
                 {internal_error, invalid_params, ID})}
         end;
-handle_request(?method_post, #{type := <<"flash">>} = Params, ID) ->
-    Led = maps:get(led, Params, 1),
-    Color = maps:get(color, Params, red),
-    Reply = {result, flash(Led, Color), ID},
+handle_request(?method_notify, #{type := <<"status_update">>} = Params, ID) ->
+    Percentage = maps:get(percentage, Params, undefined),
+    Reply = case Percentage of
+                Per when is_integer(Per) -> 
+                    {result, #{percentage => Percentage}, ID};
+                undefined -> 
+                    Reason       = update_percentage_not_retrieved,
+                    ReasonBinary = iolist_to_binary(io_lib:format("~p", [Reason])),
+                    grisp_connect_jsonrpc:format_error({internal_error, ReasonBinary, ID})
+            end,
     {send_response,  grisp_connect_jsonrpc:encode(Reply)};
 handle_request(_, _, ID) ->
     Error = {internal_error, method_not_found, ID},
