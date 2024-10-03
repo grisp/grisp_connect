@@ -57,7 +57,7 @@ handle_rpc_messages([{internal_error, _, _} = E | Batch], Replies) ->
                         [grisp_connect_jsonrpc:format_error(E)| Replies]).
 
 handle_request(?method_post, #{type := <<"start_update">>} = Params, ID) ->
-    try 
+    try
         URL = maps:get(url, Params),
         Reply = case start_update(URL) of
             {error, grisp_updater_unavailable} ->
@@ -70,10 +70,10 @@ handle_request(?method_post, #{type := <<"start_update">>} = Params, ID) ->
             ok ->
                 {result, ok, ID}
         end,
-        {request, grisp_connect_jsonrpc:encode(Reply)}
+        {send_response, grisp_connect_jsonrpc:encode(Reply)}
     catch
         throw:bad_key ->
-            {request, 
+            {send_response,
              grisp_connect_jsonrpc:format_error(
                 {internal_error, invalid_params, ID})}
         end;
@@ -85,7 +85,7 @@ handle_request(?method_post, #{type := <<"flash">>} = Params, ID) ->
 handle_request(_, _, ID) ->
     Error = {internal_error, method_not_found, ID},
     FormattedError = grisp_connect_jsonrpc:format_error(Error),
-    grisp_connect_jsonrpc:encode(FormattedError).
+    {send_response, grisp_connect_jsonrpc:encode(FormattedError)}.
 
 handle_response(Response) ->
     {ID, Reply} = case Response of
