@@ -41,16 +41,17 @@ progress_init(#{client := PID} = _Opts) ->
 
 progress_update(#state{last_notification = LastLog} = State, Stats) ->
     case (erlang:system_time(millisecond) - LastLog) > 1000 of
-        false -> 
+        false ->
             {ok, State};
-        true  -> 
+        true  ->
             UpdatePercentage = progress_percent(Stats),
             % Recheck log level when there is another way to check the progress update
             ?LOG_NOTICE("Update progress: ~b%", [UpdatePercentage]),
-            grisp_connect_client:request(
-                <<"notify">>,
-                <<"status_update">>, 
-                #{percentage => UpdatePercentage}),
+            grisp_connect_client:notify(
+                <<"update">>,
+                <<"software_update_event">>,
+                #{event => progress,
+                  percentage => UpdatePercentage}),
             {ok, State#state{last_notification = erlang:system_time(millisecond)}}
     end.
 
@@ -65,6 +66,10 @@ progress_error(#state{}, Stats, Reason) ->
 
 progress_done(#state{}, _Stats) ->
     ?LOG_NOTICE("Update done", []),
+    grisp_connect_client:notify(
+        <<"update">>,
+        <<"software_update_event">>,
+        #{event => done}),
     ok.
 
 
