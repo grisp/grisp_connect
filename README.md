@@ -5,8 +5,8 @@ GRiSP.io Client Library for GRiSP. This library enables secure communication
  Mutual TLS (mTLS). To get started, add this application as a dependency in your
  GRiSP2 project.
 
-⚠️ **Note:** If you plan to use the API calls related to `grisp_updater`, make
- sure to add `grisp_updater` as a dependency in your project as well.
+⚠️ **Note:** If you plan to use the API calls related to `grisp_updater_grisp2`,
+make sure to add `grisp_updater_grisp2` as a dependency in your project as well.
 
 ## Table of content
 

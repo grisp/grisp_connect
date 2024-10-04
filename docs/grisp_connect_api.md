@@ -28,24 +28,10 @@ We use [jsonrpc](https://www.jsonrpc.org) 2.0 between frontend and backend.
 
 **`error`**:
 
-| Error Content                                            | When it Happens                                   |
-| -------------------------------------------------------- | ------------------------------------------------- |
-| `{code: -10, message: "grisp_updater unavailable"}`      | Grisp updater app is not running                  |
-| `{code: -11, message: "already updating "}`              | An update is already happening                    |
-
-</p>
-</details>
-
-<details><summary><i>Post - Flash </i></summary>
-<p>
-
-**`params`:**
-| key (required *)    | value    | description                       |
-| ------------------- | -------- | --------------------------------- |
-| `"led"` *           | integer  | Number that identifies the LED, to obtain more information about the options, you can visit [grisp_led:color/2](https://hexdocs.pm/grisp/)    |
-| `"color"`           | string   | Color of the LED, by default: red. To obtain more information about the options, you can visit [grisp_led:color/2](https://hexdocs.pm/grisp/)   |
-
-**`result`**:  `"ok"`
+| Error Content                                       | When it Happens                  |
+| ----------------------------------------------------| -------------------------------- |
+| `{code: -10, message: "grisp_updater unavailable"}` | Grisp updater app is not running |
+| `{code: -11, message: "already updating "}`         | An update is already happening   |
 
 </p>
 </details>
