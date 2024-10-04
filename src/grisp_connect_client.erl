@@ -10,6 +10,7 @@
 -export([connect/0]).
 -export([is_connected/0]).
 -export([request/3]).
+-export([notify/3]).
 
 % Internal API
 -export([connected/0]).
@@ -49,6 +50,9 @@ is_connected() ->
 
 request(Method, Type, Params) ->
     gen_statem:call(?MODULE, {?FUNCTION_NAME, Method, Type, Params}).
+
+notify(Method, Type, Params) ->
+    gen_statem:cast(?MODULE, {?FUNCTION_NAME, Method, Type, Params}).
 
 connected() ->
     gen_statem:cast(?MODULE, ?FUNCTION_NAME).
@@ -138,6 +142,10 @@ connected({call, From}, {request, Method, Type, Params},
     {keep_state,
      Data#data{requests = NewRequests},
      [{{timeout, ID}, request_timeout(), request}]};
+connected(cast, {notify, Method, Type, Params}, _Data) ->
+    Payload = grisp_connect_api:notify(Method, Type, Params),
+    grisp_connect_ws:send(Payload),
+    keep_state_and_data;
 ?HANDLE_COMMON.
 
 % Common event handling appended as last match case to each state_function

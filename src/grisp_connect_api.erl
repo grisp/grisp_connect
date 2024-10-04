@@ -2,6 +2,7 @@
 -module(grisp_connect_api).
 
 -export([request/3]).
+-export([notify/3]).
 -export([handle_msg/1]).
 
 -include_lib("kernel/include/logger.hrl").
@@ -24,6 +25,14 @@ request(Method, Type, Params) ->
     Rpc = {request, Method, maps:put(type, Type, Params), ID},
     Encoded = grisp_connect_jsonrpc:encode(Rpc),
     {ID, Encoded}.
+
+% #doc Assembles a jsonrpc notification
+-spec notify(Method :: atom() | binary(),
+              Type :: atom() | binary(),
+              Params :: map()) -> Encoded :: binary().
+notify(Method, Type, Params) ->
+    Rpc = {notification, Method, maps:put(type, Type, Params)},
+    grisp_connect_jsonrpc:encode(Rpc).
 
 % @doc Indentifies if the message is a request or a reply to a previous request.
 % In case it was a request, returns the reply to be sent to the peer.
@@ -81,9 +90,9 @@ handle_request(?method_post, #{type := <<"start_update">>} = Params, ID) ->
 handle_request(?method_notify, #{type := <<"status_update">>} = Params, ID) ->
     Percentage = maps:get(percentage, Params, undefined),
     Reply = case Percentage of
-                Per when is_integer(Per) -> 
+                Per when is_integer(Per) ->
                     {result, #{percentage => Percentage}, ID};
-                undefined -> 
+                undefined ->
                     Reason       = update_percentage_not_retrieved,
                     ReasonBinary = iolist_to_binary(io_lib:format("~p", [Reason])),
                     grisp_connect_jsonrpc:format_error({internal_error, ReasonBinary, ID})
