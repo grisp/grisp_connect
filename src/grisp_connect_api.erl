@@ -73,6 +73,8 @@ handle_request(?method_post, #{type := <<"start_update">>} = Params, ID) ->
                 {error, -10, grisp_updater_unavailable, undefined, ID};
             {error, already_updating} ->
                 {error, -11, already_updating, undefined, ID};
+            {error, boot_system_not_validated} ->
+                {error, -12, boot_system_not_validated, undefined, ID};
             {error, Reason} ->
                 ReasonBinary = iolist_to_binary(io_lib:format("~p", [Reason])),
                 grisp_connect_jsonrpc:format_error({internal_error, ReasonBinary, ID});
@@ -86,6 +88,17 @@ handle_request(?method_post, #{type := <<"start_update">>} = Params, ID) ->
              grisp_connect_jsonrpc:format_error(
                 {internal_error, invalid_params, ID})}
         end;
+handle_request(?method_post, #{type := <<"validate">>}, ID) ->
+    Reply = case grisp_updater:validate() of
+        {error, {validate_from_unbooted, PartitionIndex}} ->
+            {error, -13, validate_from_unbooted, PartitionIndex, ID};
+        {error, Reason} ->
+            ReasonBinary = iolist_to_binary(io_lib:format("~p", [Reason])),
+            grisp_connect_jsonrpc:format_error({internal_error, ReasonBinary, ID});
+        ok ->
+            {result, ok, ID}
+    end,
+    {send_response,  grisp_connect_jsonrpc:encode(Reply)};
 handle_request(_, _, ID) ->
     Error = {internal_error, method_not_found, ID},
     FormattedError = grisp_connect_jsonrpc:format_error(Error),
