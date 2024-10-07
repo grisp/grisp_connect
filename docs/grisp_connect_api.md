@@ -4,12 +4,15 @@
 - [UI Websocket API](#ui-websocket-api)
   - [Backend API](#backend-api)
     - [Requests](#requests)
+    - [Notifications](#notifications)
   - [Error Codes](#error-codes)
     - [Default error codes](#default-error-codes)
     - [Custom error codes](#custom-error-codes)
-  - [Notifications](#notifications)
 
 We use [jsonrpc](https://www.jsonrpc.org) 2.0 between frontend and backend.
+
+⚠️ **Note:** If you plan to use the API calls related to `grisp_updater`, make
+ sure to add `grisp_updater_grisp2` as a dependency in your project as well.
 
 ## Backend API
 
@@ -36,6 +39,23 @@ We use [jsonrpc](https://www.jsonrpc.org) 2.0 between frontend and backend.
 </p>
 </details>
 
+### Notifications
+
+<details><summary><code>update</code> <code>{"type":"software_update_event"}</code> - notify the current progess of grisp_updater </summary>
+<p>
+
+**`params`:**
+| key           | value                                       | type     | description                          |
+|---------------|---------------------------------------------|----------|--------------------------------------|
+|`"type"`       | `"software_update_event"`                   | required |                                      |
+|`"event_type"` | `"progress"` `"warning"` `"error"` `"done"` | required |                                      |
+|`"message"`    |  integer                                    | optional | expected in case of warning          |
+|`"reason"`     |  integer                                    | optional | expected in case of warning or error |
+|`"percentage"` |  integer                                    | optional | expected in case of progress or error|
+
+</p>
+</details>
+
 ## Error Codes
 
 ### Default error codes
@@ -58,14 +78,3 @@ Additionally to the default jsonrpc error codes the following codes will be retu
 | -2    | `"token expired"`         | token is expired                          |
 | -3    | `"device already linked"` | device needs to be unlinked first via UI  |
 | -4    | `"invalid token"`         | token is e.g. not orderly encoded         |
-
-## Notifications
-
-<details><summary><i>Notify - Status Update </i></summary>
-
-**`result`**:  `JSON Object`
-
-| key            | value             | description                       |
-| -------------- | ----------------- | --------------------------------- |
-| `"type"`       | `"status_update"` | Type of notification              |
-| `"percentage"` | integer           | Progress percentage of the update |
