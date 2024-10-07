@@ -48,6 +48,7 @@ Triggers grisp_updater to install an update from the given URL.
 Validates the current booted partition. This can only be done after an update was installed and a reboot occurred.
 This request sets the current partition as permanent in the bootloader if it is not.
 If the new partition is not validated, from the next reboot, the bootloader will load the previous one.
+This should only be called if the new software is functioning as expected.
 
 **`params`:**
 | key (required *)  | value    | description                |
