@@ -31,7 +31,27 @@ We use [jsonrpc](https://www.jsonrpc.org) 2.0 between frontend and backend.
 | Error Content                                       | When it Happens                  |
 | ----------------------------------------------------| -------------------------------- |
 | `{code: -10, message: "grisp_updater unavailable"}` | Grisp updater app is not running |
-| `{code: -11, message: "already updating "}`         | An update is already happening   |
+| `{code: -11, message: "already updating"}`         | An update is already happening   |
+| `{code: -12, message: "boot system not validated"}` | The board rebooted after an update and needs validation |
+
+</p>
+</details>
+
+<details><summary><i>Post - Validate an update</i></summary>
+<p>
+
+**`params`:**
+| key (required *)  | value    | description                |
+| ----------------- | -------- | -------------------------- |
+| `"type"` *        | string   | `"validate"`               |
+
+**`result`**:  `"ok"`
+
+**`error`**:
+
+| Error Content                                       | When it Happens                  |
+| ----------------------------------------------------| -------------------------------- |
+| `{code: -?, message: "error"}` | The partition cannot be validated |
 
 </p>
 </details>

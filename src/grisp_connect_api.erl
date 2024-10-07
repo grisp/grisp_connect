@@ -74,6 +74,8 @@ handle_request(?method_post, #{type := <<"start_update">>} = Params, ID) ->
                 {error, -10, grisp_updater_unavailable, undefined, ID};
             {error, already_updating} ->
                 {error, -11, already_updating, undefined, ID};
+            {error, boot_system_not_validated} ->
+                {error, -12, boot_system_not_validated, undefined, ID};
             {error, Reason} ->
                 ReasonBinary = iolist_to_binary(io_lib:format("~p", [Reason])),
                 grisp_connect_jsonrpc:format_error({internal_error, ReasonBinary, ID});
