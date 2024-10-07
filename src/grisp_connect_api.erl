@@ -12,7 +12,6 @@
 -define(method_post, <<"post">>).
 -define(method_patch, <<"patch">>).
 -define(method_delete, <<"delete">>).
--define(method_notify, <<"notify">>).
 
 %--- API -----------------------------------------------------------------------
 

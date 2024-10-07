@@ -50,18 +50,30 @@ progress_update(#state{last_notification = LastLog} = State, Stats) ->
             grisp_connect_client:notify(
                 <<"update">>,
                 <<"software_update_event">>,
-                #{event => progress,
+                #{event      => progress,
                   percentage => UpdatePercentage}),
             {ok, State#state{last_notification = erlang:system_time(millisecond)}}
     end.
 
 progress_warning(State, Msg, Reason) ->
     ?LOG_WARNING("Update warning; ~s: ~p", [Msg, Reason]),
+    grisp_connect_client:notify(
+        <<"update">>,
+        <<"software_update_event">>,
+        #{event   => warning,
+          reason  => Reason,
+          message => Msg}),
     {ok, State}.
 
 progress_error(#state{}, Stats, Reason) ->
-    ?LOG_ERROR("Update failed after ~b% : ~p",
-               [progress_percent(Stats), Reason]),
+    UpdatePercentage = progress_percent(Stats),
+    ?LOG_ERROR("Update failed after ~b% : ~p", [UpdatePercentage, Reason]),
+    grisp_connect_client:notify(
+        <<"update">>,
+        <<"software_update_event">>,
+        #{event      => error,
+          reason     => Reason,
+          percentage => UpdatePercentage}),
     ok.
 
 progress_done(#state{}, _Stats) ->
