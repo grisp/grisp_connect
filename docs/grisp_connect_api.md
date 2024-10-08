@@ -36,7 +36,7 @@ Triggers grisp_updater to install an update from the given URL.
 | Error Content                                       | When it Happens                  |
 | ----------------------------------------------------| -------------------------------- |
 | `{code: -10, message: "grisp_updater_unavailable"}` | Grisp updater app is not running |
-| `{code: -11, message: "already_updating"}`         | An update is already happening   |
+| `{code: -11, message: "already_updating"}`          | An update is already happening   |
 | `{code: -12, message: "boot_system_not_validated"}` | The board rebooted after an update and needs validation |
 
 </p>
@@ -76,7 +76,7 @@ This should only be called if the new software is functioning as expected.
 |---------------|---------------------------------------------|----------|--------------------------------------|
 |`"type"`       | `"software_update_event"`                   | required |                                      |
 |`"event_type"` | `"progress"` `"warning"` `"error"` `"done"` | required |                                      |
-|`"message"`    |  integer                                    | optional | expected in case of warning          |
+|`"message"`    |  integer                                    | optional | expected in case of warning or error |
 |`"reason"`     |  integer                                    | optional | expected in case of warning or error |
 |`"percentage"` |  integer                                    | optional | expected in case of progress or error|
 

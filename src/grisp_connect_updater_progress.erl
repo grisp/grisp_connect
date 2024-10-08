@@ -16,7 +16,7 @@
 -export([progress_init/1]).
 -export([progress_update/2]).
 -export([progress_warning/3]).
--export([progress_error/3]).
+-export([progress_error/4]).
 -export([progress_done/2]).
 
 
@@ -55,7 +55,7 @@ progress_update(#state{last_notification = LastLog} = State, Stats) ->
             {ok, State#state{last_notification = erlang:system_time(millisecond)}}
     end.
 
-progress_warning(State, Msg, Reason) ->
+progress_warning(State, Reason, Msg) ->
     ?LOG_WARNING("Update warning; ~s: ~p", [Msg, Reason]),
     grisp_connect_client:notify(
         <<"update">>,
@@ -65,7 +65,7 @@ progress_warning(State, Msg, Reason) ->
           message => Msg}),
     {ok, State}.
 
-progress_error(#state{}, Stats, Reason) ->
+progress_error(#state{}, Stats, Reason, Msg) ->
     UpdatePercentage = progress_percent(Stats),
     ?LOG_ERROR("Update failed after ~b% : ~p", [UpdatePercentage, Reason]),
     grisp_connect_client:notify(
@@ -73,6 +73,7 @@ progress_error(#state{}, Stats, Reason) ->
         <<"software_update_event">>,
         #{event      => error,
           reason     => Reason,
+          message    => Msg,
           percentage => UpdatePercentage}),
     ok.
 
