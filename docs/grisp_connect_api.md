@@ -18,6 +18,44 @@ We use [jsonrpc](https://www.jsonrpc.org) 2.0 between frontend and backend.
 
 ### Requests
 
+</p>
+</details>
+<details><summary><i>Get - partition_state</i></summary>
+<p>
+
+Retrieves the current state of the system’s partition, indicating whether the
+system requires a reboot, needs validation, or is running an old partition
+with no updates pending. This can be used to check if the system is running a
+ valid system, or has an update pending.
+
+**`params`:**
+| key (required *)  | value    | description         |
+| ----------------- | -------- | ------------------- |
+| `"type"` *        | string   | `"partition_state"` |
+
+**`result`**:  JSON Object
+
+| key             | value     | type     | description                                        |
+|-----------------|-----------|----------|----------------------------------------------------|
+| state           | string    | required | `"old"`, `"old_no_update"`, `"new"`, `"unknown"`   |
+| message         | string    | required | Message describing the current state of the system |
+| action_required | boolean   | required | Indicates whether any action is required (e.g., reboot, validation). |
+
+Meaning of the state:
+
+| key               | description                                                                                |
+|-------------------|--------------------------------------------------------------------------------------------|
+| `"new"`           | The system has booted into a new partition. Validation is required to finalize the update. |
+| `"old"`           | Current partition is old. A reboot is required to load the new partition.                  |
+| `"old_no_update"` | There is no update pending. The system is running the old partition.                       |
+| `"unknown"`       | The current partition state does not match any of the previous described states.           |
+
+**`error`**:
+
+| Error Content                                       | When it Happens                        |
+| ----------------------------------------------------| -------------------------------------- |
+| `{code: -10, message: "grisp_updater_unavailable"}` | Grisp updater app is not running       |
+
 <details><summary><i>Post - Start an update</i></summary>
 <p>
 

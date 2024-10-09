@@ -53,7 +53,8 @@ handle_jsonrpc({single, Rpc}) ->
 
 handle_rpc_messages([], Replies) -> lists:reverse(Replies);
 handle_rpc_messages([{request, M, Params, ID} | Batch], Replies)
-  when M == ?method_post ->
+  when M == ?method_post;
+       M == ?method_get ->
     handle_rpc_messages(Batch, [handle_request(M, Params, ID) | Replies]);
 handle_rpc_messages([{result, _, _} = Res| Batch], Replies) ->
     handle_rpc_messages(Batch, [handle_response(Res)| Replies]);
@@ -65,6 +66,18 @@ handle_rpc_messages([{internal_error, _, _} = E | Batch], Replies) ->
     handle_rpc_messages(Batch,
                         [grisp_connect_jsonrpc:format_error(E)| Replies]).
 
+handle_request(?method_get, #{type := <<"partition_state">>} = _Params, ID) ->
+    Info = get_partition_info(),
+    Reply = case Info of
+        #{state           := _State,
+          message         := _Msg,
+          action_required := _ActionRequired} = Response -> 
+            {result, Response, ID};
+        {error, Reason} -> 
+            ReasonBinary = iolist_to_binary(io_lib:format("~p", [Reason])),
+            grisp_connect_jsonrpc:format_error({internal_error, ReasonBinary, ID})
+    end,
+    {send_response, grisp_connect_jsonrpc:encode(Reply)};
 handle_request(?method_post, #{type := <<"start_update">>} = Params, ID) ->
     try
         URL = maps:get(url, Params),
@@ -121,6 +134,64 @@ start_update(URL) ->
         false -> {error, grisp_updater_unavailable}
     end.
 
+get_partition_info() ->
+    case is_running(grisp_updater) of
+        true -> 
+            Info = grisp_updater:info(),
+            #{boot := Boot, valid := Valid, next := Next} = Info,
+            ActionRequired = maps:get(action_required, Info, false),
+            case evaluate_partition_state(Boot, Valid, Next) of
+                new_boot -> 
+                    #{state           => <<"new">>, 
+                      message         => <<"New partition booted, validation required">>, 
+                      action_required => ActionRequired};
+                update_pending -> 
+                    #{state           => <<"old">>, 
+                      message         => <<"Reboot required to load new partition">>, 
+                      action_required => ActionRequired};
+                no_update_pending -> 
+                    #{state           => <<"old_no_update">>, 
+                      message         => <<"No update pending, running old partition">>,
+                      action_required => ActionRequired};
+                _ -> 
+                    #{state           => <<"unknown">>, 
+                      message         => <<"Unknown partition state">>, 
+                      action_required => ActionRequired}
+            end;
+        false -> {error, grisp_updater_unavailable}
+    end.
+
+evaluate_partition_state(BootPartition, ValidPartition, NextPartition) ->
+    case {BootPartition, ValidPartition, NextPartition} of
+        % Case 1: Booting from removable media, but system has a pending update
+        {#{type := removable}, 
+         #{type := system, id := ValidId}, 
+         #{type := system, id := NextId}} 
+            when ValidId =/= NextId -> update_pending;
+        % Case 2: Booted from system partition, but a different system partition is pending update
+        {#{type := system, id := BootId}, 
+         #{type := system, id := ValidId}, 
+         #{type := system, id := NextId}} 
+            when BootId == ValidId, ValidId =/= NextId -> update_pending;
+        % Case 3: Booted from a new partition, validation required
+        {#{type := system, id := BootId}, 
+         #{type := system, id := ValidId}, 
+         _} 
+            when BootId =/= ValidId -> new_boot;
+        % Case 4: Booted from removable media, no update pending
+        {#{type := removable}, 
+         #{type := system, id := ValidId}, 
+         #{type := system, id := NextId}}
+            when ValidId == NextId -> no_update_pending;
+        % Case 5: Booted from system partition, no update pending
+        {#{type := system, id := BootId}, 
+           _, 
+         #{type := system, id := NextId}}
+            when NextId == BootId -> no_update_pending;
+        % Default case: Unknown partition state
+        _ -> unknown_state
+    end.
+
 is_running(AppName) ->
     Apps = application:which_applications(),
     case [App || {App, _Desc, _VSN} <- Apps, App =:= AppName] of
@@ -134,6 +205,8 @@ error_atom(-3)  -> device_already_linked;
 error_atom(-4)  -> invalid_token;
 error_atom(-10) -> grisp_updater_unavailable;
 error_atom(-11) -> already_updating;
+error_atom(-12) -> boot_system_not_validated;
+error_atom(-13) -> validate_from_unbooted;
 error_atom(_)   -> jsonrpc_error.
 
 id() ->
