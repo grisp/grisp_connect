@@ -203,10 +203,6 @@ error_atom(-1)  -> device_not_linked;
 error_atom(-2)  -> token_expired;
 error_atom(-3)  -> device_already_linked;
 error_atom(-4)  -> invalid_token;
-error_atom(-10) -> grisp_updater_unavailable;
-error_atom(-11) -> already_updating;
-error_atom(-12) -> boot_system_not_validated;
-error_atom(-13) -> validate_from_unbooted;
 error_atom(_)   -> jsonrpc_error.
 
 id() ->
