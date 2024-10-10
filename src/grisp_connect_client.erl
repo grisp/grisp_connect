@@ -16,6 +16,7 @@
 -export([connected/0]).
 -export([disconnected/0]).
 -export([handle_message/1]).
+-export([reboot/0]).
 
 -behaviour(gen_statem).
 -export([init/1, terminate/3, code_change/4, callback_mode/0]).
@@ -62,6 +63,9 @@ disconnected() ->
 
 handle_message(Payload) ->
     gen_statem:cast(?MODULE, {?FUNCTION_NAME, Payload}).
+
+reboot() ->
+    erlang:send_after(1000, ?MODULE, reboot).
 
 % gen_statem CALLBACKS ---------------------------------------------------------
 
@@ -156,11 +160,17 @@ handle_common({call, From}, is_connected, State, _) when State =/= connected ->
 handle_common({call, From}, {request, _, _, _}, State, _Data)
 when State =/= connected ->
     {keep_state_and_data, [{reply, From, {error, disconnected}}]};
+handle_common(cast, {notify, _Method, _Type, _Params}, _State, _Data) ->
+    % We ignore notifications sent while disconnected
+    keep_state_and_data;
 handle_common({timeout, ID}, request, _, #data{requests = Requests} = Data) ->
     Caller = maps:get(ID, Requests),
     {keep_state,
      Data#data{requests = maps:remove(ID, Requests)},
      [{reply, Caller, {error, timeout}}]};
+handle_common(info, reboot, _, _) ->
+    init:stop(),
+    keep_state_and_data;
 handle_common(cast, Cast, _, _) ->
     error({unexpected_cast, Cast});
 handle_common({call, _}, Call, _, _) ->
