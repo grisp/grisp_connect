@@ -10,8 +10,10 @@
 -export([connect/0]).
 -export([is_connected/0]).
 -export([request/3]).
+-export([notify/3]).
 
 % Internal API
+-export([connected/0]).
 -export([disconnected/0]).
 -export([handle_message/1]).
 
@@ -48,6 +50,12 @@ is_connected() ->
 
 request(Method, Type, Params) ->
     gen_statem:call(?MODULE, {?FUNCTION_NAME, Method, Type, Params}).
+
+notify(Method, Type, Params) ->
+    gen_statem:cast(?MODULE, {?FUNCTION_NAME, Method, Type, Params}).
+
+connected() ->
+    gen_statem:cast(?MODULE, ?FUNCTION_NAME).
 
 disconnected() ->
     gen_statem:cast(?MODULE, ?FUNCTION_NAME).
@@ -97,16 +105,9 @@ connecting(enter, _OldState, _Data) ->
     {ok, Port} = application:get_env(grisp_connect, port),
     ?LOG_NOTICE(#{event => connecting, domain => Domain, port => Port}),
     grisp_connect_ws:connect(Domain, Port),
-    {keep_state_and_data, [{state_timeout, 0, wait}]};
-connecting(state_timeout, wait, Data) ->
-    case grisp_connect_ws:is_connected() of
-        true ->
-            ?LOG_NOTICE(#{event => connected}),
-            {next_state, connected, Data};
-        false ->
-            ?LOG_DEBUG(#{event => waiting_ws_connection}),
-            {keep_state_and_data, [{state_timeout, ?STD_TIMEOUT, wait}]}
-    end;
+    keep_state_and_data;
+connecting(cast, connected, Data) ->
+    {next_state, connected, Data};
 connecting(cast, disconnected, _Data) ->
     repeat_state_and_data;
 ?HANDLE_COMMON.
@@ -121,15 +122,15 @@ connected(cast, disconnected, Data) ->
     grisp_connect_log_server:stop(),
     {next_state, waiting_ip, Data};
 connected(cast, {handle_message, Payload}, #data{requests = Requests} = Data) ->
-    Replies = grisp_connect_api:handle_msg(Payload),
+    Responses = grisp_connect_api:handle_msg(Payload),
     % A reduce operation is needed to support jsonrpc batch comunications
-    case Replies of
+    case Responses of
         [] ->
             keep_state_and_data;
-        [{request, Response}] -> % Response for a GRiSP.io request
+        [{send_response, Response}] -> % Response for a GRiSP.io request
             grisp_connect_ws:send(Response),
             keep_state_and_data;
-        [{response, ID, Response}] -> % GRiSP.io response
+        [{handle_response, ID, Response}] -> % handle a GRiSP.io response
             {OtherRequests, Actions} = dispatch_response(ID, Response, Requests),
             {keep_state, Data#data{requests = OtherRequests}, Actions}
     end;
@@ -141,6 +142,10 @@ connected({call, From}, {request, Method, Type, Params},
     {keep_state,
      Data#data{requests = NewRequests},
      [{{timeout, ID}, request_timeout(), request}]};
+connected(cast, {notify, Method, Type, Params}, _Data) ->
+    Payload = grisp_connect_api:notify(Method, Type, Params),
+    grisp_connect_ws:send(Payload),
+    keep_state_and_data;
 ?HANDLE_COMMON.
 
 % Common event handling appended as last match case to each state_function

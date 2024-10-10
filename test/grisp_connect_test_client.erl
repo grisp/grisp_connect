@@ -17,7 +17,7 @@ cert_dir() -> filename:join(code:lib_dir(grisp_connect, test), "certs").
 serial_number() -> <<"0000">>.
 
 wait_connection() ->
-    wait_connection(20).
+    wait_connection(2000).
 
 wait_connection(0) ->
     ct:pal("grisp_connect_ws state:~n~p~n", [sys:get_state(grisp_connect_ws)]),
@@ -26,12 +26,12 @@ wait_connection(N) ->
     case grisp_connect:is_connected() of
        true -> ok;
        false ->
-           ct:sleep(100),
+           ct:sleep(1),
            wait_connection(N - 1)
     end.
 
 wait_disconnection() ->
-    wait_disconnection(20).
+    wait_disconnection(2000).
 
 wait_disconnection(0) ->
     ct:pal("grisp_connect_ws state:~n~p~n", [sys:get_state(grisp_connect_ws)]),
@@ -39,7 +39,7 @@ wait_disconnection(0) ->
 wait_disconnection(N) ->
     case grisp_connect:is_connected() of
         true ->
-            ct:sleep(100),
+            ct:sleep(1),
             wait_disconnection(N - 1);
         false -> ok
     end.

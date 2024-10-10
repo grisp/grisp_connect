@@ -4,7 +4,6 @@
 -export([start_link/0]).
 -export([connect/0]).
 -export([connect/2]).
--export([is_connected/0]).
 -export([send/1]).
 
 -behaviour(gen_server).
@@ -37,9 +36,6 @@ connect() ->
 connect(Server, Port) ->
     gen_server:cast(?MODULE, {?FUNCTION_NAME, Server, Port}).
 
-is_connected() ->
-    gen_server:call(?MODULE, ?FUNCTION_NAME).
-
 send(Payload) ->
     gen_server:cast(?MODULE, {?FUNCTION_NAME, Payload}).
 
@@ -47,8 +43,8 @@ send(Payload) ->
 
 init([]) -> {ok, #state{}}.
 
-handle_call(is_connected, _, #state{ws_up = Up} = S) ->
-    {reply, Up, S}.
+handle_call(Call, _, _) ->
+    error({unexpected_call, Call}).
 
 handle_cast({connect, Server, Port}, #state{gun_pid = undefined} = S) ->
     GunOpts = #{
@@ -87,6 +83,7 @@ handle_info({gun_up, Pid, http}, #state{gun_pid = GunPid} = S) ->
 handle_info({gun_upgrade, Pid, Stream, [<<"websocket">>], _},
             #state{gun_pid = Pid, ws_stream = Stream} = S) ->
     ?LOG_INFO(#{event => ws_upgrade}),
+    grisp_connect_client:connected(),
     {noreply, S#state{ws_up = true, ping_timer = start_ping_timer()}};
 handle_info({gun_response, Pid, Stream, _, Status, _Headers},
             #state{gun_pid = Pid, ws_stream = Stream} = S) ->
