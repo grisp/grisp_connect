@@ -61,8 +61,8 @@ progress_warning(State, Reason, Msg) ->
         <<"update">>,
         <<"software_update_event">>,
         #{event   => warning,
-          reason  => Reason,
-          message => Msg}),
+          reason  => as_json(Reason),
+          message => as_json_string(Msg)}),
     {ok, State}.
 
 progress_error(#state{}, Stats, Reason, Msg) ->
@@ -72,8 +72,8 @@ progress_error(#state{}, Stats, Reason, Msg) ->
         <<"update">>,
         <<"software_update_event">>,
         #{event      => error,
-          reason     => Reason,
-          message    => Msg,
+          reason     => as_json(Reason),
+          message    => as_json_string(Msg),
           percentage => UpdatePercentage}),
     ok.
 
@@ -87,6 +87,23 @@ progress_done(#state{}, _Stats) ->
 
 
 %--- Internal Functions --------------------------------------------------------
+
+as_json_string(undefined) -> null;
+as_json_string(Value) when is_binary(Value) -> Value;
+as_json_string(Value) when is_atom(Value) -> Value;
+as_json_string(Value) when is_integer(Value) -> integer_to_binary(Value);
+as_json_string(Value) when is_float(Value) -> float_to_binary(Value);
+as_json_string(Value) when is_list(Value) -> list_to_binary(Value).
+
+as_json(undefined) -> null;
+as_json(Value) when is_binary(Value) -> Value;
+as_json(Value) when is_atom(Value) -> Value;
+as_json(Value) when is_integer(Value) -> Value;
+as_json(Value) when is_float(Value) -> Value;
+as_json(Value) when is_list(Value) -> [as_json(V) || V <- Value];
+as_json(Value) when is_map(Value) ->
+    maps:from_list([{as_json_string(K), as_json(V)} || {K, V} <- maps:to_list(Value)]).
+
 
 progress_percent(Stats) ->
     #{data_total := Total, data_checked := Checked,

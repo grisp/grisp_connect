@@ -20,42 +20,41 @@ We use [jsonrpc](https://www.jsonrpc.org) 2.0 between frontend and backend.
 
 </p>
 </details>
-<details><summary><i>Get - partition_state</i></summary>
+<details><summary><i>Get - system_info</i></summary>
 <p>
 
-Retrieves the current state of the system’s partition, indicating whether the
-system requires a reboot, needs validation, or is running an old partition
-with no updates pending. This can be used to check if the system is running a
- valid system, or has an update pending.
+Retrieves the current state of the system. It returns the currently running
+release name and version and if update is enabled.
 
 **`params`:**
 | key (required *)  | value    | description         |
 | ----------------- | -------- | ------------------- |
-| `"type"` *        | string   | `"partition_state"` |
+| `"type"` *        | string   | `"system_info"` |
 
 **`result`**:  JSON Object
 
-| key             | value     | type     | description                                        |
-|-----------------|-----------|----------|----------------------------------------------------|
-| state           | string    | required | `"old"`, `"old_no_update"`, `"new"`, `"unknown"`   |
-| message         | string    | required | Message describing the current state of the system |
-| action_required | boolean   | required | Indicates whether any action is required (e.g., reboot, validation). |
+| key             | value          | type     | description                                                      |
+|-----------------|----------------|----------|------------------------------------------------------------------|
+| relname         | string or null | required | The name of the release running currently on the device          |
+| relvsn          | string or null | required | The version of the release running currently on the device       |
+| update_enabled  | boolean        | required | If updating is enbaled on the device                             |
+| boot_source     | map            | optional | `{"type": "system", "id": ID}` or `{"type": "removable"}`        |
+| update_status   | string         | optional | `"ready"`, `"updating"`, `"failed"`, or `"updated"`              |
+| update_progress | integer        | optional | The progress as a percentage                                     |
+| update_message  | string         | optional | Message describing the current state of the system               |
+| action_required | boolean        | optional | `null`, `"reboot"`, `"remove_sdcard_and_reboot"` or `"validate"` |
 
-Meaning of the state:
+Meaning of the status:
 
 | key               | description                                                                                |
 |-------------------|--------------------------------------------------------------------------------------------|
-| `"new"`           | The system has booted into a new partition. Validation is required to finalize the update. |
-| `"old"`           | Current partition is old. A reboot is required to load the new partition.                  |
-| `"old_no_update"` | There is no update pending. The system is running the old partition.                       |
-| `"unknown"`       | The current partition state does not match any of the previous described states.           |
+| `"ready"`         | The system is ready for initiating an update                                               |
+| `"updating"`      | The system is in the process of updating                                                   |
+| `"failed"`        | The update failed, but a new update can be initiated                                       |
+| `"updated"`       | The update succeed, but actions are required like "reboot" or "validate"                   |
 
-**`error`**:
-
-| Error Content                                       | When it Happens                        |
-| ----------------------------------------------------| -------------------------------------- |
-| `{code: -10, message: "grisp_updater_unavailable"}` | Grisp updater app is not running       |
-
+</p>
+</details>
 <details><summary><i>Post - Start an update</i></summary>
 <p>
 
@@ -99,7 +98,40 @@ This should only be called if the new software is functioning as expected.
 
 | Error Content                                       | When it Happens                  |
 | ----------------------------------------------------| -------------------------------- |
+| `{code: -10, message: "grisp_updater_unavailable"}` | Grisp updater app is not running |
 | `{code: -13, message: "validate_from_unbooted", data: 0}` | The current partition N cannot be validated |
+
+</p>
+</details>
+
+<details><summary><i>Post - Reboot the device</i></summary>
+<p>
+
+**`params`:**
+| key (required *)  | value    | description                |
+| ----------------- | -------- | -------------------------- |
+| `"type"` *        | string   | `"reboot"`                 |
+
+**`result`**:  `"ok"`
+
+</p>
+</details>
+
+<details><summary><i>Post - Cancel the current update</i></summary>
+<p>
+
+**`params`:**
+| key (required *)  | value    | description                |
+| ----------------- | -------- | -------------------------- |
+| `"type"` *        | string   | `"cancel"`                 |
+
+**`result`**:  `"ok"`
+
+**`error`**:
+
+| Error Content                                       | When it Happens                  |
+| ----------------------------------------------------| -------------------------------- |
+| `{code: -10, message: "grisp_updater_unavailable"}` | Grisp updater app is not running |
 
 </p>
 </details>
