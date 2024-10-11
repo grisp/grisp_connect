@@ -107,6 +107,7 @@ connecting(enter, _OldState, _Data) ->
     grisp_connect_ws:connect(Domain, Port),
     keep_state_and_data;
 connecting(cast, connected, Data) ->
+    ?LOG_NOTICE(#{event => connected}),
     {next_state, connected, Data};
 connecting(cast, disconnected, _Data) ->
     repeat_state_and_data;
