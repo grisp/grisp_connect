@@ -118,7 +118,8 @@ update_info() ->
                  #{type := system, id := ValidId},
                  #{type := system, id := NextId}}
                     when ValidId =/= NextId ->
-                        #{update_status => updated,
+                        #{update_enabled => true,
+                          update_status => updated,
                           boot_source => Boot,
                           update_message => <<"Device updated, reboot required to validate the update">>,
                           action_required => reboot};
