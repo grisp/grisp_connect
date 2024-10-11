@@ -30,7 +30,7 @@ system_info() ->
         exit:{noproc, _} ->
             % Running in a shell
             #{relname => null, relvsn => null};
-        exit:undef ->
+        error:undef ->
             % Sasl is not running
             #{relname => null, relvsn => null}
     end,
