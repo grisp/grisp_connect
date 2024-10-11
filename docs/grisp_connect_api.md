@@ -33,16 +33,16 @@ release name and version and if update is enabled.
 
 **`result`**:  JSON Object
 
-| key             | value     | type     | description                                                      |
-|-----------------|-----------|----------|------------------------------------------------------------------|
-| relname         | string    | required | The name of the release running currently on the device          |
-| relvsn          | string    | required | The version of the release running currently on the device       |
-| update_enabled  | boolean   | required | If updating is enbaled on the device                             |
-| boot_source     | map       | optional | {"type": "system", "id": ID} or {"type": "removable"}            |
-| update_status   | string    | optional | `"ready"`, `"updating"`, `"failed"`, or `"updated"`              |
-| update_progress | integer   | optional | The progress as a percentage                                     |
-| update_message  | string    | optional | Message describing the current state of the system               |
-| action_required | boolean   | optional | `null`, `"reboot"`, `"remove_sdcard_and_reboot"` or `"validate"` |
+| key             | value          | type     | description                                                      |
+|-----------------|----------------|----------|------------------------------------------------------------------|
+| relname         | string or null | required | The name of the release running currently on the device          |
+| relvsn          | string or null | required | The version of the release running currently on the device       |
+| update_enabled  | boolean        | required | If updating is enbaled on the device                             |
+| boot_source     | map            | optional | `{"type": "system", "id": ID}` or `{"type": "removable"}`        |
+| update_status   | string         | optional | `"ready"`, `"updating"`, `"failed"`, or `"updated"`              |
+| update_progress | integer        | optional | The progress as a percentage                                     |
+| update_message  | string         | optional | Message describing the current state of the system               |
+| action_required | boolean        | optional | `null`, `"reboot"`, `"remove_sdcard_and_reboot"` or `"validate"` |
 
 Meaning of the status:
 
@@ -113,6 +113,25 @@ This should only be called if the new software is functioning as expected.
 | `"type"` *        | string   | `"reboot"`                 |
 
 **`result`**:  `"ok"`
+
+</p>
+</details>
+
+<details><summary><i>Post - Cancel the current update</i></summary>
+<p>
+
+**`params`:**
+| key (required *)  | value    | description                |
+| ----------------- | -------- | -------------------------- |
+| `"type"` *        | string   | `"cancel"`                 |
+
+**`result`**:  `"ok"`
+
+**`error`**:
+
+| Error Content                                       | When it Happens                  |
+| ----------------------------------------------------| -------------------------------- |
+| `{code: -10, message: "grisp_updater_unavailable"}` | Grisp updater app is not running |
 
 </p>
 </details>

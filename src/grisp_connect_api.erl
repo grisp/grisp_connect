@@ -107,6 +107,14 @@ handle_request(?method_post, #{type := <<"validate">>}, ID) ->
 handle_request(?method_post, #{type := <<"reboot">>}, ID) ->
     grisp_connect_client:reboot(),
     {send_response,  grisp_connect_jsonrpc:encode({result, ok, ID})};
+handle_request(?method_post, #{type := <<"cancel">>}, ID) ->
+    Reply = case grisp_connect_updater:cancel() of
+        {error, grisp_updater_unavailable} ->
+            {error, -10, grisp_updater_unavailable, undefined, ID};
+        ok ->
+            {result, ok, ID}
+    end,
+    {send_response,  grisp_connect_jsonrpc:encode(Reply)};
 handle_request(_T, _P, ID) ->
     Error = {internal_error, method_not_found, ID},
     FormattedError = grisp_connect_jsonrpc:format_error(Error),

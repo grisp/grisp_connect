@@ -13,6 +13,7 @@
 -export([system_info/0]).
 -export([start_update/1]).
 -export([validate/0]).
+-export([cancel/0]).
 
 
 %--- API -----------------------------------------------------------------------
@@ -28,7 +29,10 @@ system_info() ->
     catch
         exit:{noproc, _} ->
             % Running in a shell
-            #{relname => undefined, relvsn => undefined}
+            #{relname => null, relvsn => null};
+        exit:undef ->
+            % Sasl is not running
+            #{relname => null, relvsn => null}
     end,
     UpdateInfo = update_info(),
     maps:merge(RelInfo, UpdateInfo).
@@ -44,6 +48,12 @@ start_update(URL) ->
 validate() ->
     case is_running(grisp_updater) of
         true -> grisp_updater:validate();
+        false -> {error, grisp_updater_unavailable}
+    end.
+
+cancel() ->
+    case is_running(grisp_updater) of
+        true -> grisp_updater:cancel();
         false -> {error, grisp_updater_unavailable}
     end.
 
@@ -75,7 +85,6 @@ update_info() ->
                         #{update_enabled => true,
                           boot_source => Boot,
                           update_status => ready,
-                          update_progress => 0,
                           update_message => <<"Device ready for update">>};
                 % Ready for update from valid system
                 {ready,
@@ -86,7 +95,6 @@ update_info() ->
                         #{update_enabled => true,
                           boot_source => Boot,
                           update_status => ready,
-                          update_progress => 0,
                           update_message => <<"Device ready for update">>};
                 % Updating
                 {{updating, Stats}, Boot, _, _} ->
@@ -103,7 +111,6 @@ update_info() ->
                         #{update_enabled => true,
                           boot_source => Boot,
                           update_status => failed,
-                          update_progress => 0,
                           update_message => <<"Device update failed">>};
                 % Update succeed
                 {{success, _Stats},
@@ -113,7 +120,6 @@ update_info() ->
                     when ValidId =/= NextId ->
                         #{update_status => updated,
                           boot_source => Boot,
-                          update_progress => 100,
                           update_message => <<"Device updated, reboot required to validate the update">>,
                           action_required => reboot};
                 % Booted from removable after update
@@ -125,7 +131,6 @@ update_info() ->
                         #{update_enabled => true,
                           boot_source => Boot,
                           update_status => updated,
-                          update_progress => 100,
                           update_message => <<"Device updated but the SD card wasn't removed before rebooting">>,
                           action_required => remove_sdcard_and_reboot};
                 % Updated and rebooted
@@ -137,7 +142,6 @@ update_info() ->
                         #{update_enabled => true,
                           boot_source => Boot,
                           update_status => updated,
-                          update_progress => 100,
                           update_message => <<"Device updated, validation required">>,
                           action_required => validate};
                 _ ->
