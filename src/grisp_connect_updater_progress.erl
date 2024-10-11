@@ -46,7 +46,7 @@ progress_update(#state{last_notification = LastLog} = State, Stats) ->
         true  ->
             UpdatePercentage = progress_percent(Stats),
             % Recheck log level when there is another way to check the progress update
-            ?LOG_NOTICE("Update progress: ~b%", [UpdatePercentage]),
+            ?LOG_INFO("Update progress: ~b%", [UpdatePercentage]),
             grisp_connect_client:notify(
                 <<"update">>,
                 <<"software_update_event">>,
