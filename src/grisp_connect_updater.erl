@@ -107,6 +107,12 @@ update_info() ->
                           update_progress => Percent,
                           update_message => <<"Device is updating">>};
                 % Update Failed
+                {{error, canceled}, Boot, _, _} ->
+                        #{update_enabled => true,
+                          boot_source => Boot,
+                          update_status => canceled,
+                          update_message => <<"Device update canceled">>};
+                % Update Failed
                 {{error, _Reason}, Boot, _, _} ->
                         #{update_enabled => true,
                           boot_source => Boot,

@@ -39,10 +39,10 @@ release name and version and if update is enabled.
 | relvsn          | string or null | required | The version of the release running currently on the device       |
 | update_enabled  | boolean        | required | If updating is enbaled on the device                             |
 | boot_source     | map            | optional | `{"type": "system", "id": ID}` or `{"type": "removable"}`        |
-| update_status   | string         | optional | `"ready"`, `"updating"`, `"failed"`, or `"updated"`              |
+| update_status   | string         | optional | `"ready"`, `"updating"`, `"canceled"`, `"failed"`, or `"updated"`|
 | update_progress | integer        | optional | The progress as a percentage                                     |
 | update_message  | string         | optional | Message describing the current state of the system               |
-| action_required | boolean        | optional | `null`, `"reboot"`, `"remove_sdcard_and_reboot"` or `"validate"` |
+| action_required | boolean        | optional | `"reboot"`, `"remove_sdcard_and_reboot"` or `"validate"`         |
 
 Meaning of the status:
 
@@ -50,7 +50,8 @@ Meaning of the status:
 |-------------------|--------------------------------------------------------------------------------------------|
 | `"ready"`         | The system is ready for initiating an update                                               |
 | `"updating"`      | The system is in the process of updating                                                   |
-| `"failed"`        | The update failed, but a new update can be initiated                                       |
+| `"canceled"`      | The update was canceled, a new update can be initiated                                     |
+| `"failed"`        | The update failed, a new update can be initiated                                           |
 | `"updated"`       | The update succeed, but actions are required like "reboot" or "validate"                   |
 
 </p>
