@@ -8,6 +8,22 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [1.1.0] - 2024-10-12
+
+### Added
+
+- Support for GRiSP.io software updates API
+  - update package deployment
+  - query system partition state
+  - update cancellation
+  - remote reboot
+  - progress notifications
+  - validation
+
+### Changed
+
+- Minimum `grisp` version set to 2.7
+
 ## [1.0.0] - 2024-09-26
 
 ### What's Changed
@@ -24,5 +40,6 @@ and this project adheres to
 
 **Full Changelog**: https://github.com/grisp/grisp_connect/commits/1.0.0
 
-[Unreleased]: https://github.com/grisp/grisp_connect/compare/1.0.0...HEAD
+[Unreleased]: https://github.com/grisp/grisp_connect/compare/1.1.0...HEAD
+[1.1.0]: https://github.com/grisp/grisp_connect/compare/1.0.0...1.1.0
 [1.0.0]: https://github.com/grisp/grisp_connect/compare/6b59d16383b3e5154ef839bcf5c77a6b770aada5...1.0.0
