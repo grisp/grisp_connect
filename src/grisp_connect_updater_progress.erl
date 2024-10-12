@@ -1,5 +1,4 @@
 -module(grisp_connect_updater_progress).
--behaviour(grisp_updater_progress).
 
 %--- Includes ------------------------------------------------------------------
 
