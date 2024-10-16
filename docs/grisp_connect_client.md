@@ -1,15 +1,29 @@
+# Client
+
+## State Diagram
+
 ```mermaid
-stateDiagram-v2
-    [*] --> init
-    init --> waiting_ip: connect == true
-    init --> idle: connect == false
-
-    idle --> waiting_ip: connect()
-    waiting_ip --> connecting: ip == true
-    connected --> waiting_ip: disconnected()
-    connected --> connected: request()
-    connected --> connected: handle_message()
-    connecting --> connected: ws_is_connected == true
-    connecting --> waiting_ip: disconnected()
-
+stateDiagram
+  direction TB
+  [*] --> init
+  init --> waiting_ip
+  waiting_ip --> connecting:ip available and first atempt
+  waiting_ip --> disconnected:ip available
+  disconnected --> connecting:exponential backoff timeout
+  connecting --> waiting_ip:timeout / close_connection()
+  connecting --> waiting_ip:connection died
+  connecting --> handshake:connected()
+  handshake --> waiting_ip:timeout / close_connection()
+  handshake --> waiting_ip:connection died
+  handshake --> waiting_ip:disconnect()
+  handshake --> unlinked:Handshake() response with linked = false
+  unlinked --> waiting_ip:connection died
+  unlinked --> waiting_ip:disconnect()
+  handshake --> connected:Handshake() response with linked = true
+  connected --> unlinked:DeviceUnlinked()
+  connected --> waiting_ip:connection died
+  unlinked --> connected:LinkDevice() succeed
+  unlinked --> unlinked:LinkDevice() failed
+  handshake:handshaking
+  connected:linked
 ```
