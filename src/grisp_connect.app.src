@@ -19,12 +19,26 @@
     {env, [
         {domain, "devices.grisp.io"},
         {port, 443},
-        {connect, true}, % keeps a constant connection with grisp.io
-        {ntp, false}, % if set to true, starts the NTP client
+        {ws_transport, tls},
+        {ws_path, "/grisp-connect/ws"},
         {ws_requests_timeout, 5_000},
         {ws_ping_timeout, 60_000},
-        {logs_interval, 2_000},
-        {logs_batch_size, 100},
+        {reconn_max_retries, infinity},
+        {reconn_base_delay, 1000},
+        {reconn_max_delay, 32000},
+        {reconn_multiplier, 2},
+        {reconn_jitter, 1000},
+        {features, [
+          grisp_connect_feature_system,
+          {grisp_connect_feature_logging, [
+            {logs_interval, 2_000},
+            {logs_batch_size, 100}
+          ]}
+          grisp_connect_feature_update
+        ]},
+        {reboot_allowed, true},
+        {connect, true}, % keeps a constant connection with grisp.io
+        {ntp, false}, % if set to true, starts the NTP client
         {logger, [
           % Enable our own default handler,
           % which will receive all events from boot

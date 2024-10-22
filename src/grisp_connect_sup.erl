@@ -38,19 +38,18 @@ init([]) ->
         {ok, true} -> [worker(grisp_connect_ntp, [])];
         {ok, false} -> []
     end,
-%% Notes:
-%% grisp_connect_log_server is required to be running by grisp_connect_client
-%% that starts and stops the logging loop in grisp_connect_log_server asynchronous.
-%% Hence grisp_connect_log_server should be started before grisp_connect_client
-%% and a crash in grisp_connect_log_server should crash grisp_connect_client as well.
     ChildSpecs = NTP ++ [
-        worker(grisp_connect_ws, []),
-        worker(grisp_connect_log_server, []),
         worker(grisp_connect_client, [])
     ],
     {ok, {SupFlags, ChildSpecs}}.
 
-%% internal functions
+
+%--- Internal Functions --------------------------------------------------------
 
 worker(Module, Args) ->
-    #{id => Module, start => {Module, start_link, Args}, type => worker}.
+    #{id => Module,
+      start => {Module, start_link, Args},
+      restart => permanent,
+      shutdown => 2000,
+      type => worker,
+      modules => [Module]}.

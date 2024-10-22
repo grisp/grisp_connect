@@ -3,9 +3,20 @@
 % API
 -export([decode/1]).
 -export([encode/1]).
--export([format_error/1]).
+
 
 %--- Types ---------------------------------------------------------------------
+
+-type json_rpc_message() ::
+    {request, Method :: binary(), Params :: map(), ReqRef :: binary()}
+  | {result, Result :: term(), ReqRef :: binary()}
+  | {notification, Method :: binary(), Params :: map()}
+  | {error, Code :: integer(), Message :: undefined | binary(), Data :: undefined | term(), ReqRef :: undefined | binary()}
+  | {decoding_error, Code :: integer(), Message :: undefined | binary(), Data :: undefined | term(), ReqRef :: undefined | binary()}.
+
+
+
+%--- Macros --------------------------------------------------------------------
 
 -define(V, jsonrpc => <<"2.0">>).
 -define(is_valid(Message),
@@ -18,102 +29,132 @@
     (is_map(Params) orelse is_list(Params))
 ).
 
-%--- API ----------------------------------------------------------------------
 
-decode(Term) ->
-    case json_to_term(Term) of
+%--- API -----------------------------------------------------------------------
+
+%% @doc Decode a JSONRpc text packet and returns a list of decoded messages.
+%% If some decoding errors occure while doing do, a special error message with
+%% the tag `decoding_error` that can be encoded and sent back directly to the
+%% JSONRpc peer.
+%%
+%% During JSON decoding, the `null` values are changed to `undefined` and when
+%% encoding, `undefined` values are changed back to `null`.
+%%
+%% <p>The possible decoded messages are:
+%% <ul>
+%%     <li><b><c>{request, Method :: binary(), Params :: map(), ReqRef :: binary()}</c></b></li>
+%%     <li><b><c>{result, Result :: term(), ReqRef :: binary()}</c></b></li>
+%%     <li><b><c>{notification, Method :: binary(), Params :: map()}</c></b></li>
+%%     <li><b><c>{error, Code :: integer(), Message :: undefined | binary(), Data :: undefined | term(), ReqRef :: undefined | binary()}</c></b></li>
+%%     <li><b><c>{decoding_error, Code :: integer(), Message :: undefined | binary(), Data :: undefined | term(), ReqRef :: undefined | binary()}</c></b></li>
+%% </ul>
+-spec decode(Data :: iodata()) -> [json_rpc_message()].
+decode(Data) ->
+    case json_to_term(iolist_to_binary(Data)) of
         [] ->
-            {single, {internal_error, invalid_request, null}};
+            [{decoding_error, -32600, <<"Invalid Request">>, undefined, undefined}];
         Messages when is_list(Messages) ->
-            {batch, [unpack(M) || M <- Messages]};
+            [unpack(M) || M <- Messages];
         Message when is_map(Message) ->
-            {single, unpack(Message)};
-        {error, _E} ->
-            {single, {internal_error, parse_error, null}}
+            [unpack(Message)];
+        {error, _Reason} ->
+            [{decoding_error, -32700, <<"Parse error">>, undefined, undefined}]
     end.
 
-encode([Message]) ->
-    encode(Message);
+%% @doc Encode a JSONRpc message or a list of JSONRpc messages to JSON text.
+-spec encode(Messages :: json_rpc_message() | [json_rpc_message()]) -> iodata().
 encode(Messages) when is_list(Messages) ->
     term_to_json([pack(M) || M <- Messages]);
 encode(Message) ->
-    term_to_json(pack(Message)).
+    encode([Message]).
 
-format_error({internal_error, parse_error, ID}) ->
-    {error, -32700, <<"Parse error">>, undefined, ID};
-format_error({internal_error, invalid_request, ID}) ->
-    {error, -32600, <<"Invalid request">>, undefined, ID};
-format_error({internal_error, method_not_found, ID}) ->
-    {error, -32601, <<"Method not found">>, undefined, ID};
-format_error({internal_error, invalid_params, ID}) ->
-    {error, -32602, <<"Invalid params">>, undefined, ID};
-format_error({internal_error, Reason, ID}) ->
-    {error, -32603, <<"Internal error">>, Reason, ID}.
 
-%--- Internal -----------------------------------------------------------------
+%--- Internal ------------------------------------------------------------------
+
+as_bin(undefined) -> undefined;
+as_bin(Binary) when is_binary(Binary) -> Binary;
+as_bin(List) when is_list(List) -> list_to_binary(List);
+as_bin(Atom) when is_atom(Atom) -> atom_to_binary(Atom).
 
 unpack(#{method := Method, params := Params, id := ID} = M)
-        when ?is_valid(M), ?is_method(Method), ?is_params(Params) ->
-    {request, Method, Params, ID};
+  when ?is_valid(M), ?is_method(Method), ?is_params(Params), id =/= undefined ->
+    {request, as_bin(Method), Params, as_bin(ID)};
 unpack(#{method := Method, id := ID} = M)
-        when ?is_valid(M), ?is_method(Method) ->
-    {request, Method, undefined, ID};
+  when ?is_valid(M), ?is_method(Method), ID =/= undefined ->
+    {request, as_bin(Method), undefined, as_bin(ID)};
 unpack(#{method := Method, params := Params} = M)
-        when ?is_valid(M), ?is_method(Method), ?is_params(Params) ->
-    {notification, Method, Params};
+  when ?is_valid(M), ?is_method(Method), ?is_params(Params) ->
+    {notification, as_bin(Method), Params};
 unpack(#{method := Method} = M)
-        when ?is_valid(M), ?is_method(Method) ->
-    {notification, Method, undefined};
-unpack(#{method := Method, params := _Params, id := ID} = M)
-        when ?is_valid(M), ?is_method(Method) ->
-    {internal_error, invalid_params, ID};
+  when ?is_valid(M), ?is_method(Method) ->
+    {notification, as_bin(Method), undefined};
 unpack(#{result := Result, id := ID} = M)
-        when ?is_valid(M) ->
-    {result, Result, ID};
-unpack(#{error := #{code := Code,
-                    message := Message,
-                    data := Data},
-                    id := ID} = M)
-        when ?is_valid(M) ->
-    {error, Code, Message, Data, ID};
-unpack(#{error := #{code := Code,
-                    message := Message},
-                    id := ID} = M)
-        when ?is_valid(M) ->
-    {error, Code, Message, undefined, ID};
-unpack(M) ->
-    {internal_error, invalid_request, id(M)}.
+  when ?is_valid(M) ->
+    {result, Result, as_bin(ID)};
+unpack(#{error := #{code := Code, message := Message, data := Data},
+         id := ID} = M)
+  when ?is_valid(M), is_integer(Code) ->
+    {error, Code, as_bin(Message), Data, as_bin(ID)};
+unpack(#{error := #{code := Code, message := Message}, id := ID} = M)
+  when ?is_valid(M), is_integer(Code) ->
+    {error, Code, as_bin(Message), undefined, as_bin(ID)};
+unpack(#{id := ID}) ->
+    {decoding_error, -32600, <<"Invalid Request">>, undefined, as_bin(ID)};
+unpack(_M) ->
+    {decoding_error, -32600, <<"Invalid Request">>, undefined, undefined}.
 
-pack({request, Method, undefined, ID}) ->
+pack({request, Method, undefined, ID})
+  when is_binary(Method), is_binary(ID) ->
     #{?V, method => Method, id => ID};
-pack({request, Method, Params, ID}) ->
+pack({request, Method, Params, ID})
+  when is_binary(Method), is_binary(ID), Params =:= undefined orelse is_map(Params), is_binary(ID) ->
     #{?V, method => Method, params => Params, id => ID};
-pack({notification, Method, undefined}) ->
+pack({notification, Method, undefined})
+  when is_binary(Method) ->
     #{?V, method => Method};
-pack({notification, Method, Params}) ->
+pack({notification, Method, Params})
+  when is_binary(Method), Params =:= undefined orelse is_map(Params) ->
     #{?V, method => Method, params => Params};
-pack({result, Result, ID}) ->
+pack({result, Result, ID})
+  when is_binary(ID) ->
     #{?V, result => Result, id => ID};
-pack({error, Type, ID}) ->
-    pack(format_error({internal_error, Type, ID}));
-pack({error, Code, Message, undefined, undefined}) ->
+pack({ErrorTag, Code, Message, undefined, undefined})
+  when ErrorTag =:= error, ErrorTag =:= decoding_error, is_integer(Code),
+       Message =:= undefined orelse is_binary(Message) ->
     #{?V, error => #{code => Code, message => Message}, id => null};
-pack({error, Code, Message, undefined, ID}) ->
+pack({ErrorTag, Code, Message, undefined, ID})
+  when ErrorTag =:= error, ErrorTag =:= decoding_error, is_integer(Code),
+       Message =:= undefined orelse is_binary(Message), is_binary(ID) ->
     #{?V, error => #{code => Code, message => Message}, id => ID};
-pack({error, Code, Message, Data, undefined}) ->
+pack({ErrorTag, Code, Message, Data, undefined})
+  when ErrorTag =:= error, ErrorTag =:= decoding_error, is_integer(Code),
+       Message =:= undefined orelse is_binary(Message) ->
     #{?V, error => #{code => Code, message => Message, data => Data, id => null}};
-pack({error, Code, Message, Data, ID}) ->
-    #{?V, error => #{code => Code, message => Message, data => Data}, id => ID}.
-
-id(Object) when is_map(Object) -> maps:get(id, Object, null);
-id(_Object) -> null.
-
+pack({ErrorTag, Code, Message, Data, ID})
+  when ErrorTag =:= error, ErrorTag =:= decoding_error, is_integer(Code),
+       Message =:= undefined orelse is_binary(Message), is_binary(ID) ->
+    #{?V, error => #{code => Code, message => Message, data => Data}, id => ID};
+pack(_Message) ->
+    erlang:error(badarg).
 
 json_to_term(Bin) ->
-    try jsx:decode(Bin, [{labels, attempt_atom}, return_maps])
+    try jsx:decode(Bin, [{labels, attempt_atom}, return_maps]) of
+        Json -> postprocess(Json)
     catch
         error:E -> {error, E}
     end.
 
-term_to_json(Map) ->
-    jsx:encode(Map).
+term_to_json(Term) ->
+    jsx:encode(preprocess(Term)).
+
+postprocess(null) -> undefined;
+postprocess(List) when is_list(List) ->
+    [postprocess(E) || E <- List];
+postprocess(Map) when is_map(Map) ->
+    maps:from_list([{K, postprocess(V)} || {K, V} <- maps:to_list(Map)]).
+
+preprocess(undefined) -> null;
+preprocess(List) when is_list(List) ->
+    [preprocess(E) || E <- List];
+preprocess(Map) when is_map(Map) ->
+    maps:from_list([{K, preprocess(V)} || {K, V} <- maps:to_list(Map)]).

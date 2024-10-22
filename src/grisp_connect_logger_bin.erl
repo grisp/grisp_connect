@@ -150,7 +150,7 @@ handle_info(_, _, State) ->
 terminate(_Name, _Reason, _State) ->
     ok.
 
-% %--- Log Filtering Functions ---------------------------------------------------
+%--- Log Filtering Functions ---------------------------------------------------
 
 filter_out(LogEvent = #{meta := Meta}, Mfa = {M, F, A})
   when is_atom(M), is_atom(F), is_integer(A) ->
