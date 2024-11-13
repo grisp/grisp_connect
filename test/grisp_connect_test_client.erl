@@ -1,4 +1,4 @@
-%% @doc Test helper functions for the client setup to connect to grisp_manager
+%% @doc Test helper functions for the client setup to connect to the server
 %% @end
 
 -module(grisp_connect_test_client).

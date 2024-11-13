@@ -200,6 +200,10 @@ Run tests:
 
     rebar3 ct
 
+To run the tests it might be necessary that you clean out the _build folder in case you compiled with another profile before:
+
+    rm -rf _build
+
 ### Development on GRiSP Hardware
 
 Add an entry in the grisp hosts file so the domain www.seawater.local points
