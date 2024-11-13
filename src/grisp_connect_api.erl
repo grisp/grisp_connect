@@ -46,10 +46,19 @@ handle_msg(JSON) ->
 
 %--- Internal Funcitons --------------------------------------------------------
 
-handle_jsonrpc({batch, Batch}) ->
-    handle_rpc_messages(Batch, []);
-handle_jsonrpc({single, Rpc}) ->
-    handle_rpc_messages([Rpc], []).
+format_error({internal_error, parse_error, ID}) ->
+    {error, -32700, <<"Parse error">>, undefined, ID};
+format_error({internal_error, invalid_request, ID}) ->
+    {error, -32600, <<"Invalid request">>, undefined, ID};
+format_error({internal_error, method_not_found, ID}) ->
+    {error, -32601, <<"Method not found">>, undefined, ID};
+format_error({internal_error, invalid_params, ID}) ->
+    {error, -32602, <<"Invalid params">>, undefined, ID};
+format_error({internal_error, Reason, ID}) ->
+    {error, -32603, <<"Internal error">>, Reason, ID}.
+
+handle_jsonrpc(Messages) ->
+    handle_rpc_messages(Messages, []).
 
 handle_rpc_messages([], Replies) -> lists:reverse(Replies);
 handle_rpc_messages([{request, M, Params, ID} | Batch], Replies)
@@ -61,8 +70,8 @@ handle_rpc_messages([{result, _, _} = Res| Batch], Replies) ->
 handle_rpc_messages([{error, _Code, _Msg, _Data, _ID} = E | Batch], Replies) ->
     ?LOG_INFO("Received JsonRPC error: ~p",[E]),
     handle_rpc_messages(Batch, [handle_response(E)| Replies]);
-handle_rpc_messages([{internal_error, _, _} = E | Batch], Replies) ->
-    ?LOG_ERROR("JsonRPC: ~p",[E]),
+handle_rpc_messages([{decoding_error, _, _, _, _} = E | Batch], Replies) ->
+    ?LOG_ERROR("JsonRPC decoding error: ~p",[E]),
     handle_rpc_messages(Batch, Replies).
 
 handle_request(?method_get, #{type := <<"system_info">>} = _Params, ID) ->
@@ -80,7 +89,7 @@ handle_request(?method_post, #{type := <<"start_update">>} = Params, ID) ->
                 {error, -12, boot_system_not_validated, undefined, ID};
             {error, Reason} ->
                 ReasonBinary = iolist_to_binary(io_lib:format("~p", [Reason])),
-                grisp_connect_jsonrpc:format_error({internal_error, ReasonBinary, ID});
+                format_error({internal_error, ReasonBinary, ID});
             ok ->
                 {result, ok, ID}
         end,
@@ -88,8 +97,7 @@ handle_request(?method_post, #{type := <<"start_update">>} = Params, ID) ->
     catch
         throw:bad_key ->
             {send_response,
-             grisp_connect_jsonrpc:format_error(
-                {internal_error, invalid_params, ID})}
+             format_error({internal_error, invalid_params, ID})}
         end;
 handle_request(?method_post, #{type := <<"validate">>}, ID) ->
     Reply = case grisp_connect_updater:validate() of
@@ -99,7 +107,7 @@ handle_request(?method_post, #{type := <<"validate">>}, ID) ->
             {error, -13, validate_from_unbooted, PartitionIndex, ID};
         {error, Reason} ->
             ReasonBinary = iolist_to_binary(io_lib:format("~p", [Reason])),
-            grisp_connect_jsonrpc:format_error({internal_error, ReasonBinary, ID});
+            format_error({internal_error, ReasonBinary, ID});
         ok ->
             {result, ok, ID}
     end,
@@ -117,7 +125,7 @@ handle_request(?method_post, #{type := <<"cancel">>}, ID) ->
     {send_response,  grisp_connect_jsonrpc:encode(Reply)};
 handle_request(_T, _P, ID) ->
     Error = {internal_error, method_not_found, ID},
-    FormattedError = grisp_connect_jsonrpc:format_error(Error),
+    FormattedError = format_error(Error),
     {send_response, grisp_connect_jsonrpc:encode(FormattedError)}.
 
 handle_response(Response) ->
