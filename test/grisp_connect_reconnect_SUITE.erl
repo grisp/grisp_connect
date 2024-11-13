@@ -38,7 +38,7 @@ end_per_suite(Config) ->
 init_per_testcase(_, Config) ->
     start_cowboy(cert_dir()),
     {ok, _} = application:ensure_all_started(grisp_emulation),
-    application:set_env(grisp_connect, ws_ping_timeout, 60_000),
+    application:set_env(grisp_connect, ws_ping_timeout, 120_000),
     {ok, _} = application:ensure_all_started(grisp_connect),
     Config.
 
