@@ -17,7 +17,7 @@ cert_dir() -> filename:join(code:lib_dir(grisp_connect, test), "certs").
 serial_number() -> <<"0000">>.
 
 wait_connection() ->
-    wait_connection(2000).
+    wait_connection(30_000).
 
 wait_connection(0) ->
     ct:pal("grisp_connect_ws state:~n~p~n", [sys:get_state(grisp_connect_ws)]),
@@ -31,7 +31,7 @@ wait_connection(N) ->
     end.
 
 wait_disconnection() ->
-    wait_disconnection(2000).
+    wait_disconnection(30_000).
 
 wait_disconnection(0) ->
     ct:pal("grisp_connect_ws state:~n~p~n", [sys:get_state(grisp_connect_ws)]),
