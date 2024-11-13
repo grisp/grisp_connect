@@ -138,7 +138,7 @@ websocket_info({listen, Pid}, State) ->
     {[], [Pid | State]};
 websocket_info({send_text, Msg}, State) ->
     {[{text, Msg}], State};
-websocket_info(close, State) ->
+websocket_info(close_websocket, State) ->
     {[close], State};
 websocket_info(Info, State) ->
     ct:pal("Ignore websocket info:~n~p", [Info]),
