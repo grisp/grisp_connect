@@ -9,16 +9,16 @@
 %--- API -----------------------------------------------------------------------
 
 async_eval(Fun) ->
-        spawn_link(
-          fun() ->
-                  Res = Fun(),
-                  receive {'$async_get_result', Pid} ->
-                              Pid ! {'$async_result', Res} end
-          end).
+    spawn_link(
+      fun() ->
+              Res = Fun(),
+              receive {'$async_get_result', Pid} ->
+                          Pid ! {'$async_result', Res} end
+      end).
 
 async_get_result(Pid) ->
-                 unlink(Pid),
-                 Pid ! {'$async_get_result', self()},
-                 receive {'$async_result', Res} -> Res
-                 after 1000 -> error({timeout, waiting_result})
-                 end.
+    unlink(Pid),
+    Pid ! {'$async_get_result', self()},
+    receive {'$async_result', Res} -> Res
+    after 1000 -> error({timeout, waiting_result})
+    end.
