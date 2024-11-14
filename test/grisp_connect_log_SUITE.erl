@@ -151,7 +151,7 @@ meta_data_test(_) ->
     grisp_connect:log(error, ["Test meta", Meta]),
     send_logs(),
     ct:pal("Expected seq:~n~p~n", [Seq]),
-    Id = ?receiveJsonRpcRequest(
+    Id = ?receiveRequest(
             <<"post">>,
             #{type := <<"logs">>,
               events :=
@@ -191,8 +191,7 @@ check_log(Seq, Level, Text) ->
     send_logs(),
     ct:pal("Expected seq:~n~p~nExpected level:~n~p~nExpected text:~n~p",
            [Seq, Level, Text]),
-    Id = ?receiveJsonRpcRequest(<<"post">>,
-                                #{type := <<"logs">>,
-                                  events := [[Seq, #{msg := Text,
-                                                     level := Level}]]}),
+    Id = ?receiveRequest(<<"post">>,
+                         #{type := <<"logs">>,
+                           events := [[Seq, #{msg := Text, level := Level}]]}),
     send_jsonrpc_result(#{seq => Seq, dropped => 0}, Id).
