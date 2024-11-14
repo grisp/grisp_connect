@@ -57,8 +57,13 @@ format_error({internal_error, invalid_params, ID}) ->
 format_error({internal_error, Reason, ID}) ->
     {error, -32603, <<"Internal error">>, Reason, ID}.
 
-handle_jsonrpc(Messages) ->
-    handle_rpc_messages(Messages, []).
+%FIXME: Batch are not supported yet. When receiving a batch of messages, as per
+%       the JSON-RPC standard, all the responses should goes in a single batch
+%       of responses.
+handle_jsonrpc(Messages) when is_list(Messages) ->
+    handle_rpc_messages(Messages, []);
+handle_jsonrpc(Message) ->
+    handle_rpc_messages([Message], []).
 
 handle_rpc_messages([], Replies) -> lists:reverse(Replies);
 handle_rpc_messages([{request, M, Params, ID} | Batch], Replies)

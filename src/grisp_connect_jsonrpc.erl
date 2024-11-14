@@ -38,10 +38,15 @@
 
 %--- API -----------------------------------------------------------------------
 
-%% @doc Decode a JSONRpc text packet and returns a list of decoded messages.
-%% If some decoding errors occure while doing do, a special error message with
-%% the tag `decoding_error' that can be encoded and sent back directly to the
-%% JSONRpc peer.
+%% @doc Decode a JSONRpc text packet and decoded message or a list of decoded
+%% messages in the case of a batch.
+%%
+%% If it returns a list, the all the responses are supposed to be sent back in
+%% a batch too, as per the JSONRpc 2.0 specifications.
+%%
+%% If some decoding errors occure, a special error message with the tag
+%% `decoding_error' will be returned, this message can be encoded and sent back
+%% directly to the JSON-RPC peer.
 %%
 %% During JSON decoding, the `null' values are changed to `undefined' and when
 %% encoding, `undefined' values are changed back to `null'.
@@ -57,7 +62,7 @@
 %%     <li><b>`{error, Code :: integer(), Message :: undefined | binary(), Data :: undefined | term(), ReqRef :: undefined | binary() | integer()}'</b></li>
 %%     <li><b>`{decoding_error, Code :: integer(), Message :: undefined | binary(), Data :: undefined | term(), ReqRef :: undefined | binary() | integer()}'</b></li>
 %% </ul></p>
--spec decode(Data :: iodata()) -> [json_rpc_message()].
+-spec decode(Data :: iodata()) -> json_rpc_message() | [json_rpc_message()].
 decode(Data) ->
     case json_to_term(iolist_to_binary(Data)) of
         [] ->
@@ -65,9 +70,11 @@ decode(Data) ->
         Messages when is_list(Messages) ->
             [unpack(M) || M <- Messages];
         Message when is_map(Message) ->
-            [unpack(Message)];
+            unpack(Message);
         {error, _Reason} ->
-            [{decoding_error, -32700, <<"Parse error">>, undefined, undefined}]
+            % Even though the data could have been a batch, we return a single
+            % error, as per JSON-RPC specifications
+            {decoding_error, -32700, <<"Parse error">>, undefined, undefined}
     end.
 
 %% @doc Encode a JSONRpc message or a list of JSONRpc messages to JSON text.
@@ -76,7 +83,7 @@ decode(Data) ->
 encode(Messages) when is_list(Messages) ->
     term_to_json([pack(M) || M <- Messages]);
 encode(Message) ->
-    encode([Message]).
+    term_to_json(pack(Message)).
 
 
 %--- Internal ------------------------------------------------------------------

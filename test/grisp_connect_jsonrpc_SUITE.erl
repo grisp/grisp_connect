@@ -29,7 +29,7 @@ all() -> [
 positional_parameters(_) ->
     Term = {request, <<"subtract">>, [42,23], 1},
     Json = <<"{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"subtract\",\"params\":[42,23]}">>,
-    ?assertMatch([Term], grisp_connect_jsonrpc:decode(Json)),
+    ?assertMatch(Term, grisp_connect_jsonrpc:decode(Json)),
     Json2 = grisp_connect_jsonrpc:encode(Term),
     ?assert(jsonrpc_check([<<"\"id\":1">>,
                            <<"\"method\":\"subtract\"">>,
@@ -38,7 +38,7 @@ positional_parameters(_) ->
 named_parameters(_) ->
     Term = {request, <<"divide">>, #{<<"dividend">> => 42, <<"divisor">> => 2}, 2},
     Json = <<"{\"id\":2,\"jsonrpc\":\"2.0\",\"method\":\"divide\",\"params\":{\"dividend\":42,\"divisor\":2}}">>,
-    ?assertMatch([Term], grisp_connect_jsonrpc:decode(Json)),
+    ?assertMatch(Term, grisp_connect_jsonrpc:decode(Json)),
     Json2 = grisp_connect_jsonrpc:encode(Term),
     ?assert(jsonrpc_check([<<"\"id\":2">>,
                            <<"\"method\":\"divide\"">>,
@@ -49,14 +49,14 @@ using_existing_atoms(_) ->
     % The ID and method are matching existing atoms, checks they are not atoms
     Term = {request, <<"notification">>, #{}, <<"request">>},
     Json = <<"{\"id\":\"request\",\"jsonrpc\":\"2.0\",\"method\":\"notification\",\"params\":{}}">>,
-    ?assertMatch([Term], grisp_connect_jsonrpc:decode(Json)),
+    ?assertMatch(Term, grisp_connect_jsonrpc:decode(Json)),
     Json2 = grisp_connect_jsonrpc:encode(Term),
     ?assert(jsonrpc_check([<<"\"id\":\"request\"">>, <<"\"method\":\"notification\"">>], Json2)).
 
 notification(_) ->
     Term = {notification, <<"update">>, [1,2,3,4,5]},
     Json = <<"{\"jsonrpc\":\"2.0\",\"method\":\"update\",\"params\":[1,2,3,4,5]}">>,
-    ?assertMatch([Term], grisp_connect_jsonrpc:decode(Json)),
+    ?assertMatch(Term, grisp_connect_jsonrpc:decode(Json)),
     Json2 = grisp_connect_jsonrpc:encode(Term),
     ?assert(jsonrpc_check([<<"\"method\":\"update\"">>,
                            <<"\"params\":[1,2,3,4,5]">>], Json2)).
@@ -64,7 +64,7 @@ notification(_) ->
 invalid_json(_) ->
     Term = {decoding_error, -32700, <<"Parse error">>, undefined, undefined},
     Json = <<"{\"jsonrpc\":\"2.0\",\"method\":\"foobar,\"params\":\"bar\",\"baz]">>,
-    ?assertMatch([Term], grisp_connect_jsonrpc:decode(Json)),
+    ?assertMatch(Term, grisp_connect_jsonrpc:decode(Json)),
     JsonError = grisp_connect_jsonrpc:encode(Term),
     ?assert(jsonrpc_check([<<"\"error\":{">>,
                             <<"\"code\":-32700">>,
@@ -74,7 +74,7 @@ invalid_json(_) ->
 invalid_request(_) ->
     Term = {decoding_error, -32600, <<"Invalid request">>, undefined, undefined},
     Json = <<"{\"jsonrpc\":\"2.0\",\"method\":1,\"params\":\"bar\"}">>,
-    ?assertMatch([Term], grisp_connect_jsonrpc:decode(Json)),
+    ?assertMatch(Term, grisp_connect_jsonrpc:decode(Json)),
     JsonError = grisp_connect_jsonrpc:encode(Term),
     ?assert(jsonrpc_check([<<"\"error\":{">>,
                            <<"\"code\":-32600">>,
@@ -98,7 +98,7 @@ batch(_) ->
 result(_) ->
     Term = {result, 7, 45},
     Json = <<"{\"id\":45,\"jsonrpc\":\"2.0\",\"result\":7}">>,
-    ?assertMatch([Term], grisp_connect_jsonrpc:decode(Json)),
+    ?assertMatch(Term, grisp_connect_jsonrpc:decode(Json)),
     Json2 = grisp_connect_jsonrpc:encode(Term),
     ?assert(jsonrpc_check([<<"\"id\":45">>,
                            <<"\"result\":7">>], Json2)).
@@ -106,7 +106,7 @@ result(_) ->
 null_values(_) ->
     Term = {notification, <<"test_null">>, #{array => [undefined], object => #{foo => undefined}, value => undefined}},
     Json = <<"{\"jsonrpc\":\"2.0\",\"method\":\"test_null\",\"params\":{\"array\":[null],\"object\":{\"foo\":null},\"value\":null}}">>,
-    ?assertMatch([Term], grisp_connect_jsonrpc:decode(Json)),
+    ?assertMatch(Term, grisp_connect_jsonrpc:decode(Json)),
     Json2 = grisp_connect_jsonrpc:encode(Term),
     ?assert(jsonrpc_check([<<"\"array\":[null]">>,
                            <<"\"foo\":null">>,
