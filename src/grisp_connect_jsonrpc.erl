@@ -40,23 +40,23 @@
 
 %% @doc Decode a JSONRpc text packet and returns a list of decoded messages.
 %% If some decoding errors occure while doing do, a special error message with
-%% the tag `decoding_error` that can be encoded and sent back directly to the
+%% the tag `decoding_error' that can be encoded and sent back directly to the
 %% JSONRpc peer.
 %%
-%% During JSON decoding, the `null` values are changed to `undefined` and when
-%% encoding, `undefined` values are changed back to `null`.
+%% During JSON decoding, the `null' values are changed to `undefined' and when
+%% encoding, `undefined' values are changed back to `null'.
 %%
-%% The `method` will <b>always</b> be a binary, and `id` will always be either
+%% The `method' will <b>always</b> be a binary, and `id' will always be either
 %% a binary or an integer.
 %%
 %% <p>The possible decoded messages are:
 %% <ul>
-%%     <li><b><c>{request, Method :: binary(), Params :: map() | list(), ReqRef :: binary() | integer()}</c></b></li>
-%%     <li><b><c>{result, Result :: term(), ReqRef :: binary()}</c></b></li>
-%%     <li><b><c>{notification, Method :: binary(), Params :: map() | list()}</c></b></li>
-%%     <li><b><c>{error, Code :: integer(), Message :: undefined | binary(), Data :: undefined | term(), ReqRef :: undefined | binary() | integer()}</c></b></li>
-%%     <li><b><c>{decoding_error, Code :: integer(), Message :: undefined | binary(), Data :: undefined | term(), ReqRef :: undefined | binary() | integer()}</c></b></li>
-%% </ul>
+%%     <li><b>`{request, Method :: binary(), Params :: map() | list(), ReqRef :: binary() | integer()}'</b></li>
+%%     <li><b>`{result, Result :: term(), ReqRef :: binary()}'</b></li>
+%%     <li><b>`{notification, Method :: binary(), Params :: map() | list()}'</b></li>
+%%     <li><b>`{error, Code :: integer(), Message :: undefined | binary(), Data :: undefined | term(), ReqRef :: undefined | binary() | integer()}'</b></li>
+%%     <li><b>`{decoding_error, Code :: integer(), Message :: undefined | binary(), Data :: undefined | term(), ReqRef :: undefined | binary() | integer()}'</b></li>
+%% </ul></p>
 -spec decode(Data :: iodata()) -> [json_rpc_message()].
 decode(Data) ->
     case json_to_term(iolist_to_binary(Data)) of
@@ -71,7 +71,7 @@ decode(Data) ->
     end.
 
 %% @doc Encode a JSONRpc message or a list of JSONRpc messages to JSON text.
-%% For backward compatibility, the `method` can be an atom.
+%% For backward compatibility, the `method' can be an atom.
 -spec encode(Messages :: json_rpc_message() | [json_rpc_message()]) -> iodata().
 encode(Messages) when is_list(Messages) ->
     term_to_json([pack(M) || M <- Messages]);
