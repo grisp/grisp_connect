@@ -11,7 +11,8 @@
         invalid_json/1,
         invalid_request/1,
         batch/1,
-        result/1]).
+        result/1,
+        null_values/1]).
 
 all() -> [
     positional_parameters,
@@ -21,7 +22,8 @@ all() -> [
     invalid_json,
     invalid_request,
     batch,
-    result
+    result,
+    null_values
 ].
 
 positional_parameters(_) ->
@@ -87,7 +89,7 @@ batch(_) ->
     JsonError = grisp_connect_jsonrpc:encode([Term1, Term2]),
     ?assert(jsonrpc_check([<<"\"id\":\"1\"">>,
                            <<"\"method\":\"sum\"">>,
-                           <<"params\":[1,2,4]">>,
+                           <<"\"params\":[1,2,4]">>,
                            <<"\"error\":{">>,
                            <<"\"code\":-32600">>,
                            <<"\"message\":\"Invalid request\"">>,
@@ -100,6 +102,16 @@ result(_) ->
     Json2 = grisp_connect_jsonrpc:encode(Term),
     ?assert(jsonrpc_check([<<"\"id\":45">>,
                            <<"\"result\":7">>], Json2)).
+
+null_values(_) ->
+    Term = {notification, <<"test_null">>, #{array => [undefined], object => #{foo => undefined}, value => undefined}},
+    Json = <<"{\"jsonrpc\":\"2.0\",\"method\":\"test_null\",\"params\":{\"array\":[null],\"object\":{\"foo\":null},\"value\":null}}">>,
+    ?assertMatch([Term], grisp_connect_jsonrpc:decode(Json)),
+    Json2 = grisp_connect_jsonrpc:encode(Term),
+    ?assert(jsonrpc_check([<<"\"array\":[null]">>,
+                           <<"\"foo\":null">>,
+                           <<"\"value\":null">>],
+                          Json2)).
 
 jsonrpc_check(Elements, JsonString) ->
     Elements2 = [<<"\"jsonrpc\":\"2.0\"">>| Elements],

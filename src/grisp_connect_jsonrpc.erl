@@ -15,7 +15,7 @@
   | {error, Code :: integer(), Message :: undefined | binary(),
      Data :: undefined | term(), ReqRef :: undefined | binary() | integer()}
   | {decoding_error, Code :: integer(), Message :: undefined | binary(),
-     Data :: undefined | term(), ReqRef :: undefined | binary()}.
+     Data :: undefined | term(), ReqRef :: undefined | binary() | integer()}.
 
 
 
@@ -83,14 +83,12 @@ encode(Message) ->
 
 as_bin(undefined) -> undefined;
 as_bin(Binary) when is_binary(Binary) -> Binary;
-as_bin(List) when is_list(List) -> list_to_binary(List);
-as_bin(Atom) when is_atom(Atom) -> atom_to_binary(Atom).
+as_bin(List) when is_list(List) -> list_to_binary(List).
 
 as_id(undefined) -> undefined;
 as_id(Integer) when is_integer(Integer) -> Integer;
 as_id(Binary) when is_binary(Binary) -> Binary;
-as_id(List) when is_list(List) -> list_to_binary(List);
-as_id(Atom) when is_atom(Atom) -> atom_to_binary(Atom).
+as_id(List) when is_list(List) -> list_to_binary(List).
 
 unpack(#{method := Method, params := Params, id := ID} = M)
   when ?is_valid(M), ?is_method(Method), ?is_params(Params), ID =/= undefined ->
@@ -152,8 +150,8 @@ pack({ErrorTag, Code, Message, Data, ID})
   when ErrorTag =:= error orelse ErrorTag =:= decoding_error, is_integer(Code),
        Message =:= undefined orelse is_binary(Message), ?is_id(ID) ->
     #{?V, error => #{code => Code, message => Message, data => Data}, id => ID};
-pack(_Message) ->
-    erlang:error({badarg, _Message}).
+pack(Message) ->
+    erlang:error({badarg, Message}).
 
 json_to_term(Bin) ->
     try jsx:decode(Bin, [{labels, attempt_atom}, return_maps]) of
@@ -166,14 +164,13 @@ term_to_json(Term) ->
     jsx:encode(preprocess(Term)).
 
 postprocess(null) -> undefined;
-postprocess(Atom) when is_atom(Atom) -> Atom;
 postprocess(Integer) when is_integer(Integer) -> Integer;
 postprocess(Float) when is_float(Float) -> Float;
 postprocess(Binary) when is_binary(Binary) -> Binary;
 postprocess(List) when is_list(List) ->
     [postprocess(E) || E <- List];
 postprocess(Map) when is_map(Map) ->
-    maps:from_list([{K, postprocess(V)} || {K, V} <- maps:to_list(Map)]).
+    maps:map(fun(_K, V) -> postprocess(V) end, Map).
 
 preprocess(undefined) -> null;
 preprocess(Atom) when is_atom(Atom) -> Atom;
@@ -183,4 +180,4 @@ preprocess(Binary) when is_binary(Binary) -> Binary;
 preprocess(List) when is_list(List) ->
     [preprocess(E) || E <- List];
 preprocess(Map) when is_map(Map) ->
-    maps:from_list([{K, preprocess(V)} || {K, V} <- maps:to_list(Map)]).
+    maps:map(fun(_K, V) -> preprocess(V) end, Map).
