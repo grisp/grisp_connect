@@ -48,11 +48,12 @@ end_per_testcase(_, Config) ->
     flush(),
     Config.
 
+
 %--- Tests ---------------------------------------------------------------------
 
 reconnect_on_gun_crash_test(_) ->
     ?assertMatch(ok, wait_connection(100)),
-    {state, GunPid, _, _, _, _} = sys:get_state(grisp_connect_ws),
+    GunPid = connection_gun_pid(),
     proc_lib:stop(GunPid),
     ?assertMatch(ok, wait_disconnection()),
     ?assertMatch(ok, wait_connection()).
@@ -62,23 +63,31 @@ reconnect_on_disconnection_test(Config) ->
     stop_cowboy(),
     ?assertMatch(ok, wait_disconnection()),
     start_cowboy(cert_dir()),
-    ?assertMatch(ok, wait_connection(100)),
+    ?assertMatch(ok, wait_connection(1200)),
     Config.
 
 reconnect_on_ping_timeout_test(_) ->
     ?assertMatch(ok, wait_connection()),
-    {state, GunPid, _, _, _, _} = sys:get_state(grisp_connect_ws),
+    GunPid = connection_gun_pid(),
     proc_lib:stop(GunPid),
     % Now decrease ping timeout so that the WS closes after just 1 second
     application:set_env(grisp_connect, ws_ping_timeout, 1500),
     ?assertMatch(ok, wait_disconnection()),
-    ?assertMatch(ok, wait_connection(150)),
+    ?assertMatch(ok, wait_connection(1200)),
     ?assertMatch(ok, wait_disconnection()),
-    ?assertMatch(ok, wait_connection(150)),
+    ?assertMatch(ok, wait_connection(1200)),
     ?assertMatch(ok, wait_disconnection()).
 
 reconnect_on_closed_frame_test(_) ->
     ?assertMatch(ok, wait_connection()),
     close_websocket(),
     ?assertMatch(ok, wait_disconnection()),
-    ?assertMatch(ok, wait_connection(100)).
+    ?assertMatch(ok, wait_connection(1200)).
+
+
+%--- Internal Functions --------------------------------------------------------
+
+connection_gun_pid() ->
+    {_, {data, _, _, _, _, ConnPid, _}} = sys:get_state(grisp_connect_client),
+    {state, _, _, _, _, _, _, _, _, _, _, GunPid, _, _, _, _} = sys:get_state(ConnPid),
+    GunPid.

@@ -66,7 +66,7 @@
 decode(Data) ->
     case json_to_term(iolist_to_binary(Data)) of
         [] ->
-            [{decoding_error, -32600, <<"Invalid Request">>, undefined, undefined}];
+            {decoding_error, -32600, <<"Invalid Request">>, undefined, undefined};
         Messages when is_list(Messages) ->
             [unpack(M) || M <- Messages];
         Message when is_map(Message) ->
@@ -120,9 +120,9 @@ unpack(#{error := #{code := Code, message := Message}, id := ID} = M)
   when ?is_valid(M), is_integer(Code) ->
     {error, Code, as_bin(Message), undefined, as_id(ID)};
 unpack(#{id := ID}) ->
-    {decoding_error, -32600, <<"Invalid request">>, undefined, as_id(ID)};
+    {decoding_error, -32600, <<"Invalid Request">>, undefined, as_id(ID)};
 unpack(_M) ->
-    {decoding_error, -32600, <<"Invalid request">>, undefined, undefined}.
+    {decoding_error, -32600, <<"Invalid Request">>, undefined, undefined}.
 
 pack({request, Method, undefined, ID})
   when is_binary(Method) orelse is_atom(Method), ?is_id(ID) ->

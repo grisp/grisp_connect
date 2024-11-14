@@ -5,6 +5,12 @@
 %% @end
 -module(grisp_connect_client).
 
+-behaviour(gen_statem).
+
+-include("grisp_connect_internal.hrl").
+
+-import(grisp_connect_utils, [as_bin/1]).
+
 % External API
 -export([start_link/0]).
 -export([connect/0]).
@@ -13,12 +19,9 @@
 -export([notify/3]).
 
 % Internal API
--export([connected/0]).
--export([disconnected/0]).
--export([handle_message/1]).
 -export([reboot/0]).
 
--behaviour(gen_statem).
+% Behaviour gen_statem callback functions
 -export([init/1, terminate/3, code_change/4, callback_mode/0]).
 
 % State Functions
@@ -27,18 +30,50 @@
 -export([connecting/3]).
 -export([connected/3]).
 
--include_lib("kernel/include/logger.hrl").
+
+%--- Types ---------------------------------------------------------------------
+
+-record(data, {
+    domain :: binary(),
+    port :: inet:port_number(),
+    ws_path :: binary(),
+    ws_transport :: tcp | tls,
+    conn :: undefined | pid(),
+    retry_count = 0 :: non_neg_integer()
+}).
+
+-type data() :: #data{}.
+-type on_result_fun() :: fun((data(), Result :: term()) -> data()).
+-type on_error_fun() :: fun((data(), local | remote,
+                             Code :: atom() | integer(),
+                             Message :: undefined | binary(),
+                             Data :: term()) -> data()).
+
+
+%--- Macros --------------------------------------------------------------------
 
 -define(STD_TIMEOUT, 1000).
+-define(CONNECT_TIMEOUT, 2000).
+-define(ENV(KEY, GUARDS), fun() ->
+    case application:get_env(grisp_connect, KEY) of
+        {ok, V} when GUARDS -> V;
+        {ok, V} -> erlang:exit({invalid_env, KEY, V});
+        undefined -> erlang:exit({missing_env, KEY})
+    end
+end()).
+-define(ENV(KEY, GUARDS, CONV), fun() ->
+    case application:get_env(grisp_connect, KEY) of
+        {ok, V} when GUARDS -> CONV;
+        {ok, V} -> erlang:exit({invalid_env, KEY, V});
+        undefined -> erlang:exit({missing_env, KEY})
+    end
+end()).
 -define(HANDLE_COMMON,
     ?FUNCTION_NAME(EventType, EventContent, Data) ->
         handle_common(EventType, EventContent, ?FUNCTION_NAME, Data)).
 
--record(data, {
-    requests = #{}
-}).
 
-% API
+%--- External API Functions ----------------------------------------------------
 
 start_link() ->
     gen_statem:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -47,7 +82,9 @@ connect() ->
     gen_statem:cast(?MODULE, ?FUNCTION_NAME).
 
 is_connected() ->
-    gen_statem:call(?MODULE, ?FUNCTION_NAME).
+    try gen_statem:call(?MODULE, ?FUNCTION_NAME)
+    catch exit:noproc -> false
+    end.
 
 request(Method, Type, Params) ->
     gen_statem:call(?MODULE, {?FUNCTION_NAME, Method, Type, Params}).
@@ -55,35 +92,47 @@ request(Method, Type, Params) ->
 notify(Method, Type, Params) ->
     gen_statem:cast(?MODULE, {?FUNCTION_NAME, Method, Type, Params}).
 
-connected() ->
-    gen_statem:cast(?MODULE, ?FUNCTION_NAME).
 
-disconnected() ->
-    gen_statem:cast(?MODULE, ?FUNCTION_NAME).
-
-handle_message(Payload) ->
-    gen_statem:cast(?MODULE, {?FUNCTION_NAME, Payload}).
+%--- Internal API Functions ----------------------------------------------------
 
 reboot() ->
     erlang:send_after(1000, ?MODULE, reboot).
 
-% gen_statem CALLBACKS ---------------------------------------------------------
+
+%--- Behaviour gen_statem Callback Functions -----------------------------------
 
 init([]) ->
-    {ok, Connect} = application:get_env(grisp_connect, connect),
-    NextState = case Connect of
+    process_flag(trap_exit, true),
+    AutoConnect = ?ENV(connect, is_boolean(V)),
+    Domain = ?ENV(domain, is_binary(V) orelse is_list(V) orelse is_atom(V), as_bin(V)),
+    Port = ?ENV(port, is_integer(V) andalso V >= 0 andalso V < 65536),
+    WsTransport = ?ENV(ws_transport, V =:= tls orelse V =:= tcp),
+    WsPath = ?ENV(ws_path, is_binary(V) orelse is_list(V), as_bin(V)),
+    Data = #data{
+        domain = Domain,
+        port = Port,
+        ws_transport = WsTransport,
+        ws_path = WsPath
+    },
+    % The error list is put in a persistent term to not add noise to the state.
+    persistent_term:put({?MODULE, self()}, generic_errors()),
+    NextState = case AutoConnect of
         true -> waiting_ip;
         false -> idle
     end,
-    {ok, NextState, #data{}}.
+    {ok, NextState, Data}.
 
-terminate(_Reason, _State, _Data) -> ok.
+terminate(Reason, _State, Data) ->
+    conn_close(Data, Reason),
+    persistent_term:erase({?MODULE, self()}),
+    ok.
 
 code_change(_Vsn, State, Data, _Extra) -> {ok, State, Data}.
 
 callback_mode() -> [state_functions, state_enter].
 
-%%% STATE CALLBACKS ------------------------------------------------------------
+
+%--- Behaviour gen_statem State Callback Functions -----------------------------
 
 idle(enter, _OldState, _Data) ->
     keep_state_and_data;
@@ -91,30 +140,47 @@ idle(cast, connect, Data) ->
     {next_state, waiting_ip, Data};
 ?HANDLE_COMMON.
 
-waiting_ip(enter, _OldState, _Data) ->
-    {keep_state_and_data, [{state_timeout, 0, retry}]};
-waiting_ip(state_timeout, retry, Data) ->
+waiting_ip(enter, _OldState, Data) ->
+    Delay = case Data#data.retry_count > 0 of
+        true -> ?STD_TIMEOUT;
+        false -> 0
+    end,
+    {keep_state_and_data, [{state_timeout, Delay, retry}]};
+waiting_ip(state_timeout, retry, Data = #data{retry_count = RetryCount}) ->
     case check_inet_ipv4() of
         {ok, IP} ->
             ?LOG_INFO(#{event => checked_ip, ip => IP}),
             {next_state, connecting, Data};
         invalid ->
             ?LOG_DEBUG(#{event => waiting_ip}),
-            {next_state, waiting_ip, Data, [{state_timeout, ?STD_TIMEOUT, retry}]}
+            {next_state, waiting_ip, Data#data{retry_count = RetryCount + 1},
+             [{state_timeout, ?STD_TIMEOUT, retry}]}
     end;
 ?HANDLE_COMMON.
 
-connecting(enter, _OldState, _Data) ->
-    {ok, Domain} = application:get_env(grisp_connect, domain),
-    {ok, Port} = application:get_env(grisp_connect, port),
-    ?LOG_NOTICE(#{event => connecting, domain => Domain, port => Port}),
-    grisp_connect_ws:connect(Domain, Port),
-    keep_state_and_data;
-connecting(cast, connected, Data) ->
-    ?LOG_NOTICE(#{event => connected}),
-    {next_state, connected, Data};
-connecting(cast, disconnected, _Data) ->
-    repeat_state_and_data;
+connecting(enter, _OldState, Data) ->
+    {keep_state, Data, [{state_timeout, 0, connect}]};
+connecting(state_timeout, connect,
+           Data = #data{conn = undefined, retry_count = RetryCount}) ->
+    ?GRISP_INFO("Connecting to grisp.io", [], #{event => connecting}),
+    case conn_start(Data) of
+        {ok, Data2} ->
+            {keep_state, Data2, [{state_timeout, ?CONNECT_TIMEOUT, timeout}]};
+        {error, Reason} ->
+            ?LOG_WARNING("Failed to connect to grisp.io: ~p", [Reason],
+                         #{event => connection_failed, reason => Reason}),
+            {next_state, waiting_ip, Data#data{retry_count = RetryCount + 1}}
+    end;
+connecting(state_timeout, timeout, Data = #data{retry_count = RetryCount}) ->
+    Reason = connect_timeout,
+    ?GRISP_WARN("Timeout while connecting to grisp.io", [],
+                #{event => connection_failed, reason => Reason}),
+    Data2 = conn_close(Data, Reason),
+    {next_state, waiting_ip, Data2#data{retry_count = RetryCount + 1}};
+connecting(info, {conn, Conn, connected}, Data = #data{conn = Conn}) ->
+    % Received from the connection process
+    ?GRISP_INFO("Connected to grisp.io", [], #{event => connected}),
+    {next_state, connected, Data#data{retry_count = 0}};
 ?HANDLE_COMMON.
 
 connected(enter, _OldState, _Data) ->
@@ -122,34 +188,15 @@ connected(enter, _OldState, _Data) ->
     keep_state_and_data;
 connected({call, From}, is_connected, _) ->
     {keep_state_and_data, [{reply, From, true}]};
-connected(cast, disconnected, Data) ->
-    ?LOG_WARNING(#{event => disconnected}),
-    grisp_connect_log_server:stop(),
-    {next_state, waiting_ip, Data};
-connected(cast, {handle_message, Payload}, #data{requests = Requests} = Data) ->
-    Responses = grisp_connect_api:handle_msg(Payload),
-    % A reduce operation is needed to support jsonrpc batch comunications
-    case Responses of
-        [] ->
-            keep_state_and_data;
-        [{send_response, Response}] -> % Response for a GRiSP.io request
-            grisp_connect_ws:send(Response),
-            keep_state_and_data;
-        [{handle_response, ID, Response}] -> % handle a GRiSP.io response
-            {OtherRequests, Actions} = dispatch_response(ID, Response, Requests),
-            {keep_state, Data#data{requests = OtherRequests}, Actions}
-    end;
-connected({call, From}, {request, Method, Type, Params},
-          #data{requests = Requests} = Data) ->
-    {ID, Payload} = grisp_connect_api:request(Method, Type, Params),
-    grisp_connect_ws:send(Payload),
-    NewRequests = Requests#{ID => From},
-    {keep_state,
-     Data#data{requests = NewRequests},
-     [{{timeout, ID}, request_timeout(), request}]};
-connected(cast, {notify, Method, Type, Params}, _Data) ->
-    Payload = grisp_connect_api:notify(Method, Type, Params),
-    grisp_connect_ws:send(Payload),
+connected(info, {conn, Conn, Msg}, Data = #data{conn = Conn}) ->
+    handle_connection_message(Data, Msg);
+connected({call, From}, {request, Method, Type, Params}, Data) ->
+    Data2 = conn_post(Data, Method, Type, Params,
+                fun(D, R) -> gen_statem:reply(From, {ok, R}), D end,
+                fun(D, _, C, _, _) -> gen_statem:reply(From, {error, C}), D end),
+    {keep_state, Data2};
+connected(cast, {notify, Method, Type, Params}, Data) ->
+    conn_notify(Data, Method, Type, Params),
     keep_state_and_data;
 ?HANDLE_COMMON.
 
@@ -164,13 +211,18 @@ when State =/= connected ->
 handle_common(cast, {notify, _Method, _Type, _Params}, _State, _Data) ->
     % We ignore notifications sent while disconnected
     keep_state_and_data;
-handle_common({timeout, ID}, request, _, #data{requests = Requests} = Data) ->
-    Caller = maps:get(ID, Requests),
-    {keep_state,
-     Data#data{requests = maps:remove(ID, Requests)},
-     [{reply, Caller, {error, timeout}}]};
 handle_common(info, reboot, _, _) ->
     init:stop(),
+    keep_state_and_data;
+handle_common(info, {'EXIT', Conn, Reason}, _State,
+              Data = #data{conn = Conn, retry_count = RetryCount}) ->
+    % The connection process died
+    ?GRISP_WARN("The connection to grisp.io died: ~p", [Reason],
+                #{event => connection_failed, reason => Reason}),
+    {next_state, waiting_ip, conn_died(Data#data{retry_count = RetryCount + 1})};
+handle_common(info, {conn, Conn, Msg}, State, _Data) ->
+    ?LOG_DEBUG("Received message from unknown connection ~p in state ~w: ~p",
+               [Conn, State, Msg]),
     keep_state_and_data;
 handle_common(cast, Cast, _, _) ->
     error({unexpected_cast, Cast});
@@ -183,22 +235,113 @@ handle_common(info, Info, State, Data) ->
                  data => Data}),
     keep_state_and_data.
 
-% INTERNALS --------------------------------------------------------------------
 
-dispatch_response(ID, Response, Requests) ->
-    case maps:take(ID, Requests) of
-        {Caller, OtherRequests} ->
-            Actions = [{{timeout, ID}, cancel}, {reply, Caller, Response}],
-            {OtherRequests, Actions};
-        error ->
-            ?LOG_DEBUG(#{event => ?FUNCTION_NAME, reason => {missing_id, ID},
-                         data => Response}),
-            {Requests, []}
+%--- Internal Functions --------------------------------------------------------
+
+generic_errors() -> [
+    {device_not_linked,          -1, <<"Device no linked">>},
+    {token_expired,              -2, <<"Token expired">>},
+    {device_already_linked,      -3, <<"Device already linked">>},
+    {invalid_token,              -4, <<"Invalid token">>},
+    {grisp_updater_unavailable, -10, <<"Software update unavailable">>},
+    {boot_system_not_validated, -12, <<"Boot system not validated">>},
+    {validate_from_unbooted,    -13, <<"Validate from unbooted">>}
+].
+
+handle_connection_message(_Data, {response, _Result, #{on_result := undefined}}) ->
+    keep_state_and_data;
+handle_connection_message(Data, {response, Result, #{on_result := OnResult}}) ->
+    {keep_state, OnResult(Data, Result)};
+handle_connection_message(_Data, {remote_error, Code, Msg, _ErrorData,
+                                 #{on_error := undefined}}) ->
+    ?LOG_WARNING("Unhandled remote request error ~w: ~s", [Code, Msg]),
+    keep_state_and_data;
+handle_connection_message(Data, {remote_error, Code, Msg, ErrorData,
+                                 #{on_error := OnError}}) ->
+    {keep_state, OnError(Data, remote, Code, Msg, ErrorData)};
+
+handle_connection_message(_Data, {local_error, Reason,
+                                 #{on_error := undefined}}) ->
+    ?LOG_WARNING("Unhandled local request error ~w", [Reason]),
+    keep_state_and_data;
+handle_connection_message(Data, {local_error, Reason,
+                                 #{on_error := OnError}}) ->
+    {keep_state, OnError(Data, local, Reason, undefined, undefined)};
+handle_connection_message(Data, Msg) ->
+    case grisp_connect_api:handle_msg(Msg) of
+        ok -> keep_state_and_data;
+        {reply, Result, ReqRef} ->
+            conn_reply(Data, Result, ReqRef),
+            keep_state_and_data
     end.
 
-request_timeout() ->
-    {ok, V} = application:get_env(grisp_connect, ws_requests_timeout),
-    V.
+% Connection Functions
+
+conn_start(Data = #data{conn = undefined,
+                        domain = Domain,
+                        port = Port,
+                        ws_path = WsPath,
+                        ws_transport = WsTransport}) ->
+    WsPingTimeout = ?ENV(ws_ping_timeout, V =:= infinity orelse is_integer(V)),
+    WsReqTimeout = ?ENV(ws_request_timeout, V =:= infinity orelse is_integer(V)),
+    ConnTransport = case WsTransport of
+        tcp -> tcp;
+        tls -> {tls, grisp_cryptoauth_tls:options(Domain)}
+    end,
+    ErrorList = persistent_term:get({?MODULE, self()}),
+    ConnOpts = #{
+        domain => Domain,
+        port => Port,
+        transport => ConnTransport,
+        path => WsPath,
+        errors => ErrorList,
+        ping_timeout => WsPingTimeout,
+        request_timeout => WsReqTimeout
+    },
+    case grisp_connect_connection:start_link(self(), ConnOpts) of
+        {error, _Reason} = Error -> Error;
+        {ok, Conn} -> {ok, Data#data{conn = Conn}}
+    end.
+
+% Safe to call in any state
+conn_close(Data = #data{conn = undefined}, _Reason) ->
+    Data;
+conn_close(Data = #data{conn = Conn}, _Reason) ->
+    grisp_connect_log_server:stop(),
+    catch grisp_connect_connection:disconnect(Conn),
+    Data#data{conn = undefined}.
+
+% Safe to call in any state
+conn_died(Data) ->
+    grisp_connect_log_server:stop(),
+    Data#data{conn = undefined}.
+
+-spec conn_post(data(), grisp_connect_connection:method(), atom(), map(),
+                undefined | on_result_fun(), undefined | on_error_fun())
+    -> data().
+conn_post(Data = #data{conn = Conn}, Method, Type, Params, OnResult, OnError)
+  when Conn =/= undefined ->
+    ReqCtx = #{on_result => OnResult, on_error => OnError},
+    Params2 = maps:put(type, Type, Params),
+    try grisp_connect_connection:post(Conn, Method, Params2, ReqCtx) of
+        _ -> Data
+    catch
+        _:Reason when OnError =/= undefined ->
+            OnError(Data, local, Reason, undefined, undefined);
+        _:_ ->
+            Data
+    end.
+
+conn_notify(#data{conn = Conn}, Method, Type, Params)
+  when Conn =/= undefined ->
+    Params2 = maps:put(type, Type, Params),
+    catch grisp_connect_connection:notify(Conn, Method, Params2),
+    ok.
+
+conn_reply(#data{conn = Conn}, Result, ReqRef)
+  when Conn =/= undefined ->
+    catch grisp_connect_connection:reply(Conn, Result, ReqRef),
+    ok.
 
 % IP check functions
 

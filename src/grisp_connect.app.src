@@ -21,26 +21,24 @@
         {port, 443},
         {connect, true}, % keeps a constant connection with grisp.io
         {ntp, false}, % if set to true, starts the NTP client
-        {ws_requests_timeout, 5_000},
+        {ws_transport, tls},
+        {ws_path, "/grisp-connect/ws"},
+        {ws_request_timeout, 5_000},
         {ws_ping_timeout, 60_000},
         {logs_interval, 2_000},
         {logs_batch_size, 100},
         {logger, [
-          % Enable our own default handler,
-          % which will receive all events from boot
-          {handler,
-           grisp_connect_log_handler,
-           grisp_connect_logger_bin,
-           #{formatter => {grisp_connect_logger_bin, #{}},
-             % Filter out supervisor progress reports to prevent the ones
-             % from tls_dyn_connection_sup that logs all the certificates
-             % to crash the connection...
-             filters => [
-                {filter_out_progress,
-                  {fun grisp_connect_logger_bin:filter_out/2,
-                    {supervisor, report_progress}}}
-             ]
-           }}
+            % Enable our own default handler,
+            % which will receive all events from boot
+            {handler,
+                grisp_connect_log_handler,
+                grisp_connect_logger_bin,
+                #{formatter => {grisp_connect_logger_bin, #{}},
+                filter_default => log,
+                filters => [
+                    {disable_progress, {fun logger_filters:progress/2, stop}}
+                ]
+            }}
         ]}
     ]},
     {modules, []},
