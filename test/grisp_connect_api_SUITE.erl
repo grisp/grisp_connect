@@ -7,6 +7,9 @@
 
 -compile([export_all, nowarn_export_all]).
 
+-import(grisp_connect_test_async, [async_eval/1]).
+-import(grisp_connect_test_async, [async_get_result/1]).
+
 -import(grisp_connect_test_client, [wait_connection/0]).
 -import(grisp_connect_test_client, [wait_connection/1]).
 -import(grisp_connect_test_client, [wait_disconnection/0]).
@@ -37,7 +40,6 @@ end_per_suite(Config) ->
     [?assertEqual(ok, application:stop(App)) || App <- ?config(apps, Config)].
 
 init_per_testcase(TestCase, Config) ->
-    process_flag(trap_exit, true),
     {ok, _} = application:ensure_all_started(grisp_emulation),
     {ok, _} = application:ensure_all_started(grisp_connect),
     case TestCase of
@@ -59,10 +61,10 @@ auto_connect_test(_) ->
     ?assertMatch(ok, wait_connection()).
 
 ping_test(_) ->
-    Pid = ?asyncAssertEqual({ok, <<"pong">>}, grisp_connect:ping()),
+    Pid = async_eval(fun grisp_connect:ping/0),
     Id = ?receiveRequest(<<"post">>, #{type := <<"ping">>}),
     send_jsonrpc_result(<<"pong">>, Id),
-    ?asyncWait(Pid).
+    ?assertEqual({ok, <<"pong">>}, async_get_result(Pid)).
 
 link_device_test(_) ->
     ?assertMatch({error, token_undefined}, grisp_connect:link_device()),
@@ -71,37 +73,33 @@ link_device_test(_) ->
 
     % handle successful responses
     % ok
-    Pid1 = ?asyncAssertEqual({ok, <<"ok">>},
-                                      grisp_connect:link_device()),
+    Pid1 = async_eval(fun grisp_connect:link_device/0),
     Id1 = ?receiveRequest(<<"post">>,
                           #{type := <<"device_linking_token">>,
                             token := Token}),
     send_jsonrpc_result(<<"ok">>, Id1),
-    ?asyncWait(Pid1),
+    ?assertEqual({ok, <<"ok">>}, async_get_result(Pid1)),
     % device_already_linked
-    Pid2 = ?asyncAssertEqual({ok, <<"device_already_linked">>},
-                             grisp_connect:link_device()),
+    Pid2 = async_eval(fun grisp_connect:link_device/0),
     Id2 = ?receiveRequest(<<"post">>,
                           #{type := <<"device_linking_token">>,
                             token := Token}),
     send_jsonrpc_result(<<"device_already_linked">>,
                                                   Id2),
-    ?asyncWait(Pid2),
+    ?assertEqual({ok, <<"device_already_linked">>}, async_get_result(Pid2)),
 
     % handle error responses
     % device_already_linked
-    Pid3 = ?asyncAssertEqual({error, device_already_linked},
-                             grisp_connect:link_device()),
+    Pid3 = async_eval(fun grisp_connect:link_device/0),
     Id3 = ?receiveRequest(<<"post">>,
                           #{type := <<"device_linking_token">>,
                             token := Token}),
     send_jsonrpc_error(-3, <<"device already linked">>, Id3),
-    ?asyncWait(Pid3),
+    ?assertEqual({error, device_already_linked}, async_get_result(Pid3)),
     % invalid_token
-    Pid4 = ?asyncAssertEqual({error, invalid_token},
-                             grisp_connect:link_device()),
+    Pid4 = async_eval(fun grisp_connect:link_device/0),
     Id4 = ?receiveRequest(<<"post">>,
                           #{type := <<"device_linking_token">>,
                             token := Token}),
     send_jsonrpc_error(-4, <<"invalid token">>, Id4),
-    ?asyncWait(Pid4).
+    ?assertEqual({error, invalid_token}, async_get_result(Pid4)).
