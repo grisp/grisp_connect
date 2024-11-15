@@ -12,13 +12,23 @@ async_eval(Fun) ->
     spawn_link(
       fun() ->
               Res = Fun(),
-              receive {'$async_get_result', Pid} ->
-                          Pid ! {'$async_result', Res} end
+              receive
+                  {'$async_get_result', Pid} -> Pid ! {'$async_result', Res}
+              end
       end).
 
 async_get_result(Pid) ->
+    MRef = monitor(process, Pid),
     unlink(Pid),
     Pid ! {'$async_get_result', self()},
-    receive {'$async_result', Res} -> Res
-    after 1000 -> error({timeout, waiting_result})
+    receive
+        {'$async_result', Res} ->
+            receive {'DOWN', MRef, process, Pid, normal} -> ok
+            after 10 -> error({timeout, waiting_exit})
+            end,
+            Res;
+        {'DOWN', MRef, process, Pid, Reason} ->
+            error({process_down, Reason})
+    after 1000 ->
+            error({timeout, waiting_result})
     end.

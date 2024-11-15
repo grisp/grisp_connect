@@ -84,8 +84,7 @@ link_device_test(_) ->
     Id2 = ?receiveRequest(<<"post">>,
                           #{type := <<"device_linking_token">>,
                             token := Token}),
-    send_jsonrpc_result(<<"device_already_linked">>,
-                                                  Id2),
+    send_jsonrpc_result(<<"device_already_linked">>, Id2),
     ?assertEqual({ok, <<"device_already_linked">>}, async_get_result(Pid2)),
 
     % handle error responses
