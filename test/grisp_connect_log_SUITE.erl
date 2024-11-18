@@ -3,12 +3,17 @@
 -behaviour(ct_suite).
 -include_lib("common_test/include/ct.hrl").
 -include_lib("stdlib/include/assert.hrl").
+-include("grisp_connect_test.hrl").
 
 -compile([export_all, nowarn_export_all]).
 
 -import(grisp_connect_test_client, [cert_dir/0]).
 -import(grisp_connect_test_client, [serial_number/0]).
 -import(grisp_connect_test_client, [wait_connection/0]).
+
+-import(grisp_connect_test_server, [flush/0]).
+-import(grisp_connect_test_server, [receive_jsonrpc_request/0]).
+-import(grisp_connect_test_server, [send_jsonrpc_result/2]).
 
 %--- API -----------------------------------------------------------------------
 
@@ -21,20 +26,12 @@ all() ->
     ].
 
 init_per_suite(Config) ->
-    PrivDir = ?config(priv_dir, Config),
     CertDir = cert_dir(),
-
-    PolicyFile = filename:join(PrivDir, "policies.term"),
-    ?assertEqual(ok, file:write_file(PolicyFile, <<>>)),
-    application:set_env(seabac, policy_file, PolicyFile),
-
-    Config2 = grisp_connect_manager:start(Config),
-    grisp_connect_manager:kraft_start(CertDir),
-    grisp_connect_manager:link_device(),
-    [{cert_dir, CertDir} | Config2].
+    Apps = grisp_connect_test_server:start(CertDir),
+    [{apps, Apps} | Config].
 
 end_per_suite(Config) ->
-    grisp_connect_manager:cleanup_apps(?config(apps, Config)).
+    [?assertEqual(ok, application:stop(App)) || App <- ?config(apps, Config)].
 
 init_per_testcase(log_level_test, Config) ->
     #{level := Level} = logger:get_primary_config(),
@@ -43,16 +40,16 @@ init_per_testcase(log_level_test, Config) ->
 init_per_testcase(_, Config) ->
     {ok, _} = application:ensure_all_started(grisp_emulation),
     {ok, _} = application:ensure_all_started(grisp_connect),
-    ok = wait_connection(),
-    ct:sleep(1000),
-    send_logs(),
-    ct:sleep(1000),
+    ?assertEqual(ok, wait_connection()),
+    grisp_connect_test_server:listen(),
     Config.
 
 end_per_testcase(log_level_test, Config) ->
     logger:set_primary_config(level, ?config(default_level, Config)),
     end_per_testcase(other, Config);
 end_per_testcase(_, Config) ->
+    ok = application:stop(grisp_connect),
+    ?assertEqual([], flush()),
     Config.
 
 %--- Tests ---------------------------------------------------------------------
@@ -62,13 +59,11 @@ string_logs_test(_) ->
     S1 = "@#$%^&*()_ +{}|:\"<>?-[];'./,\\`~!\néäüßóçøáîùêñÄÖÜÉÁÍÓÚàèìòùÂÊÎÔÛ€",
     S2 = <<"@#$%^&*()_ +{}|:\"<>?-[];'./,\\`~!\néäüßóçøáîùêñÄÖÜÉÁÍÓÚàèìòùÂÊÎÔÛ€"/utf8>>,
     Strings = [S1, S2],
-    Texts = [<<S2/binary, "\n">>, <<S2/binary, "\n">>],
+    Texts = [<<S2/binary>>, <<S2/binary>>],
     Seqs = [LastSeq + 1, LastSeq + 2],
     Fun = fun({Seq, String, Text}) ->
                   grisp_connect:log(error, [String]),
-                  send_logs(),
-                  ct:sleep(100),
-                  check_log(Seq, error, Text)
+                  check_log(Seq, <<"error">>, Text)
           end,
     lists:map(Fun, lists:zip3(Seqs, Strings, Texts)).
 
@@ -79,17 +74,15 @@ formatted_logs_test(_) ->
                 ["~s, ~ts", ["tést", "tést"]],
                 ["~s, ~ts", [<<"tést">>, <<"tést"/utf8>>]]],
     LastSeq = last_seq(),
-    Texts = [<<"ä, €\n"/utf8>>,
-             <<"tést, tést\n"/utf8>>,
-             <<"<<\"tést\">>, <<\"tést\"/utf8>>\n"/utf8>>,
-             <<"tést, tést\n"/utf8>>,
-             <<"tést, tést\n"/utf8>>],
+    Texts = [<<"ä, €"/utf8>>,
+             <<"tést, tést"/utf8>>,
+             <<"<<\"tést\">>, <<\"tést\"/utf8>>"/utf8>>,
+             <<"tést, tést"/utf8>>,
+             <<"tést, tést"/utf8>>],
     Seqs = lists:seq(LastSeq + 1, LastSeq + length(ArgsList)),
     Fun = fun({Seq, Args, Text}) ->
                   grisp_connect:log(error, Args),
-                  send_logs(),
-                  ct:sleep(100),
-                  check_log(Seq, error, Text)
+                  check_log(Seq, <<"error">>, Text)
           end,
     lists:map(Fun, lists:zip3(Seqs, ArgsList, Texts)).
 
@@ -104,21 +97,19 @@ structured_logs_test(_) ->
               #{event => 0.1},
               #{event => {'äh', 'bäh'}}],
     LastSeq = last_seq(),
-    Texts = [<<"    event: <<\"tést\"/utf8>>\n"/utf8>>,
-             <<"    event: tést\n"/utf8>>,
-             <<"    event: <<\"tést\"/utf8>>\n"/utf8>>,
-             <<"    event: [<<\"tést1\"/utf8>>,<<\"tést2\"/utf8>>]\n"/utf8>>,
-             <<"    event: #{tèst1 => true}\n"/utf8>>,
-             <<"    event: #{<<\"errör\"/utf8>> => false}\n"/utf8>>,
-             <<"    event: 1234\n"/utf8>>,
-             <<"    event: 0.1\n"/utf8>>,
-             <<"[JSON incompatible term]\n#{event => {äh,bäh}}\n"/utf8>>],
+    Texts = [#{event => <<"tést"/utf8>>},
+             #{event => "tést"},
+             #{event => <<"tést"/utf8>>},
+             #{event => [<<"tést1"/utf8>>,<<"tést2"/utf8>>]},
+             #{event => #{'tèst1' => true}},
+             #{event => #{<<"errör"/utf8>> => false}},
+             #{event => 1234},
+             #{event => 0.1},
+             <<"[JSON incompatible term]\n#{event => {äh,bäh}}"/utf8>>],
     Seqs = lists:seq(LastSeq + 1, LastSeq + length(Events)),
     Fun = fun({Seq, Event, Text}) ->
                   grisp_connect:log(error, [Event]),
-                  send_logs(),
-                  ct:sleep(100),
-                  check_log(Seq, error, Text)
+                  check_log(Seq, <<"error">>, Text)
           end,
     lists:map(Fun, lists:zip3(Seqs, Events, Texts)).
 
@@ -135,9 +126,7 @@ log_level_test(_) ->
     Seqs = lists:seq(LastSeq + 1, LastSeq + length(Levels)),
     Fun = fun({Seq, Level}) ->
                   grisp_connect:log(Level, ["level test"]),
-                  send_logs(),
-                  ct:sleep(100),
-                  check_log(Seq, Level, <<"level test\n"/utf8>>)
+                  check_log(Seq, atom_to_binary(Level), <<"level test"/utf8>>)
           end,
     lists:map(Fun, lists:zip(Seqs, Levels)),
 
@@ -147,8 +136,7 @@ log_level_test(_) ->
     grisp_connect:log(info, ["level test"]),
     send_logs(),
     ct:sleep(100),
-    Logs = grisp_manager_device_logs:fetch(serial_number(), last_seq()),
-    ?assertEqual([], Logs).
+    ?assertEqual([], flush()).
 
 meta_data_test(_) ->
     Meta = #{custom1 => <<"binäry"/utf8>>,
@@ -158,33 +146,26 @@ meta_data_test(_) ->
              custom5 => #{boolean => true},
              custom6 => 6,
              custom7 => 7.0},
-    LoggerConfig = #{legacy_header => true,
-                     single_line => false,
-                     template => [[logger_formatter, header], "\n",
-                                  custom1, "\n",
-                                  custom2, "\n",
-                                  custom3, "\n",
-                                  custom4, "\n",
-                                  custom5, "\n",
-                                  custom6, "\n",
-                                  custom7, "\n",
-                                  msg, "\n"]},
-    application:set_env(grisp_manager, device_log_config, LoggerConfig),
-    Text = iolist_to_binary(
-             [<<"<<\"binäry\"/utf8>>\n"/utf8>>,
-              <<"\[<<\"é1\"/utf8>>,<<\"é2\"/utf8>>\]\n"/utf8>>,
-              <<"<<\"åtom\"/utf8>>\n"/utf8>>,
-              <<"#{kèy => <<\"välüe\"/utf8>>}\n"/utf8>>,
-              <<"#{boolean => true}\n"/utf8>>,
-              <<"6\n"/utf8>>,
-              <<"7.0\n"/utf8>>,
-              <<"Test meta\n"/utf8>>]),
     LastSeq = last_seq(),
     Seq = LastSeq + 1,
     grisp_connect:log(error, ["Test meta", Meta]),
     send_logs(),
-    ct:sleep(100),
-    check_log(Seq, error, Text).
+    ct:pal("Expected seq:~n~p~n", [Seq]),
+    Id = ?receiveRequest(
+            <<"post">>,
+            #{type := <<"logs">>,
+              events :=
+              [[Seq, #{msg := <<"Test meta"/utf8>>,
+                       meta :=
+                       #{custom1 := <<"binäry"/utf8>>,
+                         custom2 := [<<"é1"/utf8>>,<<"é2"/utf8>>],
+                         custom3 := <<"åtom"/utf8>>,
+                         custom4 := #{'kèy' := <<"välüe"/utf8>>},
+                         custom5 := #{boolean := true},
+                         custom6 := 6,
+                         custom7 := 7.0},
+                       level := <<"error">>}]]}),
+    send_jsonrpc_result(#{seq => Seq, dropped => 0}, Id).
 
 %--- Internal ------------------------------------------------------------------
 
@@ -193,28 +174,24 @@ send_logs() ->
     LogServer ! send_logs.
 
 last_seq() ->
-    {Seq, _} = case grisp_manager_device_logs:fetch(serial_number(), -1) of
-                   [] -> {0, []};
-                   List -> lists:last(List)
-               end,
+    send_logs(),
+    Send = receive_jsonrpc_request(),
+    ?assertMatch(#{method := <<"post">>,
+                   params := #{type := <<"logs">>,
+                               events := _,
+                               dropped := _}},
+                 Send),
+    Id = maps:get(id, Send),
+    Events = maps:get(events, maps:get(params, Send)),
+    [Seq, _] = lists:last(Events),
+    send_jsonrpc_result(#{seq => Seq, dropped => 0}, Id),
     Seq.
 
 check_log(Seq, Level, Text) ->
-    Logs = grisp_manager_device_logs:fetch(serial_number(), Seq - 1),
-    ?assertMatch([{Seq, _}], Logs, ["Text: ", Text]),
-    [{_, Log}] = Logs,
-    Split = binary:split(Log, <<"\n">>, [trim_all]),
-    ?assertMatch([_, Text], Split, ["Text: ", Text]),
-    Header = log_header(Level),
-    ?assertMatch([Header, _],
-                 binary:split(Log, <<"= ">>),
-                 ["Header: ", Header]).
-
-log_header(emergency) -> <<"=EMERGENCY REPORT===">>;
-log_header(alert)     -> <<"=ALERT REPORT===">>;
-log_header(critical)  -> <<"=CRITICAL REPORT===">>;
-log_header(error)     -> <<"=ERROR REPORT===">>;
-log_header(warning)   -> <<"=WARNING REPORT===">>;
-log_header(notice)    -> <<"=NOTICE REPORT===">>;
-log_header(info)      -> <<"=INFO REPORT===">>;
-log_header(debug)     -> <<"=DEBUG REPORT===">>.
+    send_logs(),
+    ct:pal("Expected seq:~n~p~nExpected level:~n~p~nExpected text:~n~p",
+           [Seq, Level, Text]),
+    Id = ?receiveRequest(<<"post">>,
+                         #{type := <<"logs">>,
+                           events := [[Seq, #{msg := Text, level := Level}]]}),
+    send_jsonrpc_result(#{seq => Seq, dropped => 0}, Id).

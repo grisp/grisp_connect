@@ -3,8 +3,12 @@
 -behaviour(ct_suite).
 -include_lib("common_test/include/ct.hrl").
 -include_lib("stdlib/include/assert.hrl").
+-include("grisp_connect_test.hrl").
 
 -compile([export_all, nowarn_export_all]).
+
+-import(grisp_connect_test_async, [async_eval/1]).
+-import(grisp_connect_test_async, [async_get_result/1]).
 
 -import(grisp_connect_test_client, [wait_connection/0]).
 -import(grisp_connect_test_client, [wait_connection/1]).
@@ -12,6 +16,10 @@
 -import(grisp_connect_test_client, [wait_disconnection/1]).
 -import(grisp_connect_test_client, [serial_number/0]).
 -import(grisp_connect_test_client, [cert_dir/0]).
+
+-import(grisp_connect_test_server, [flush/0]).
+-import(grisp_connect_test_server, [send_jsonrpc_result/2]).
+-import(grisp_connect_test_server, [send_jsonrpc_error/3]).
 
 %--- API -----------------------------------------------------------------------
 
@@ -24,35 +32,27 @@ all() ->
     ].
 
 init_per_suite(Config) ->
-    PrivDir = ?config(priv_dir, Config),
     CertDir = cert_dir(),
-
-    PolicyFile = filename:join(PrivDir, "policies.term"),
-    ?assertEqual(ok, file:write_file(PolicyFile, <<>>)),
-    application:set_env(seabac, policy_file, PolicyFile),
-
-    Config2 = grisp_connect_manager:start(Config),
-     grisp_connect_manager:kraft_start(CertDir),
-    [{cert_dir, CertDir} | Config2].
+    Apps = grisp_connect_test_server:start(CertDir),
+    [{apps, Apps} | Config].
 
 end_per_suite(Config) ->
-    grisp_connect_manager:cleanup_apps(?config(apps, Config)).
+    [?assertEqual(ok, application:stop(App)) || App <- ?config(apps, Config)].
 
 init_per_testcase(TestCase, Config) ->
     {ok, _} = application:ensure_all_started(grisp_emulation),
     {ok, _} = application:ensure_all_started(grisp_connect),
     case TestCase of
         auto_connect_test -> ok;
-        _ -> ok = wait_connection()
+        _ ->
+            ?assertEqual(ok, wait_connection()),
+            grisp_connect_test_server:listen()
     end,
     Config.
 
 end_per_testcase(_, Config) ->
     ok = application:stop(grisp_connect),
-    mnesia:activity(transaction, fun() ->
-        mnesia:delete({grisp_device, serial_number()})
-    end),
-    flush(),
+    ?assertEqual([], flush()),
     Config.
 
 %--- Tests ---------------------------------------------------------------------
@@ -61,20 +61,44 @@ auto_connect_test(_) ->
     ?assertMatch(ok, wait_connection()).
 
 ping_test(_) ->
-    ?assertMatch({ok, <<"pang">>}, grisp_connect:ping()).
+    Pid = async_eval(fun grisp_connect:ping/0),
+    Id = ?receiveRequest(<<"post">>, #{type := <<"ping">>}),
+    send_jsonrpc_result(<<"pong">>, Id),
+    ?assertEqual({ok, <<"pong">>}, async_get_result(Pid)).
 
 link_device_test(_) ->
     ?assertMatch({error, token_undefined}, grisp_connect:link_device()),
-    application:set_env(grisp_connect, device_linking_token, <<"token">>),
-    ?assertMatch({error, invalid_token}, grisp_connect:link_device()),
-    Token = grisp_manager_token:get_token(<<"Testuser">>),
+    Token = <<"token">>,
     application:set_env(grisp_connect, device_linking_token, Token),
-    ?assertMatch({ok, <<"ok">>}, grisp_connect:link_device()),
-    ?assertMatch({ok, <<"pong">>}, grisp_connect:ping()).
 
-%--- Internal ------------------------------------------------------------------
+    % handle successful responses
+    % ok
+    Pid1 = async_eval(fun grisp_connect:link_device/0),
+    Id1 = ?receiveRequest(<<"post">>,
+                          #{type := <<"device_linking_token">>,
+                            token := Token}),
+    send_jsonrpc_result(<<"ok">>, Id1),
+    ?assertEqual({ok, <<"ok">>}, async_get_result(Pid1)),
+    % device_already_linked
+    Pid2 = async_eval(fun grisp_connect:link_device/0),
+    Id2 = ?receiveRequest(<<"post">>,
+                          #{type := <<"device_linking_token">>,
+                            token := Token}),
+    send_jsonrpc_result(<<"device_already_linked">>, Id2),
+    ?assertEqual({ok, <<"device_already_linked">>}, async_get_result(Pid2)),
 
-flush() ->
-    receive Any -> ct:pal("Flushed: ~p", [Any]), flush()
-    after 0 -> ok
-    end.
+    % handle error responses
+    % device_already_linked
+    Pid3 = async_eval(fun grisp_connect:link_device/0),
+    Id3 = ?receiveRequest(<<"post">>,
+                          #{type := <<"device_linking_token">>,
+                            token := Token}),
+    send_jsonrpc_error(-3, <<"device already linked">>, Id3),
+    ?assertEqual({error, device_already_linked}, async_get_result(Pid3)),
+    % invalid_token
+    Pid4 = async_eval(fun grisp_connect:link_device/0),
+    Id4 = ?receiveRequest(<<"post">>,
+                          #{type := <<"device_linking_token">>,
+                            token := Token}),
+    send_jsonrpc_error(-4, <<"invalid token">>, Id4),
+    ?assertEqual({error, invalid_token}, async_get_result(Pid4)).

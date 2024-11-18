@@ -13,6 +13,11 @@
 -import(grisp_connect_test_client, [serial_number/0]).
 -import(grisp_connect_test_client, [cert_dir/0]).
 
+-import(grisp_connect_test_server, [start_cowboy/1]).
+-import(grisp_connect_test_server, [stop_cowboy/0]).
+-import(grisp_connect_test_server, [close_websocket/0]).
+-import(grisp_connect_test_server, [flush/0]).
+
 %--- API -----------------------------------------------------------------------
 
 all() ->
@@ -24,36 +29,22 @@ all() ->
     ].
 
 init_per_suite(Config) ->
-    PrivDir = ?config(priv_dir, Config),
-    CertDir = cert_dir(),
-
-    PolicyFile = filename:join(PrivDir, "policies.term"),
-    ?assertEqual(ok, file:write_file(PolicyFile, <<>>)),
-    application:set_env(seabac, policy_file, PolicyFile),
-
-    Config2 = grisp_connect_manager:start(Config),
-    [{cert_dir, CertDir} | Config2].
+    {ok, Apps} = application:ensure_all_started(cowboy),
+    [{apps, Apps} | Config].
 
 end_per_suite(Config) ->
-    grisp_connect_manager:cleanup_apps(?config(apps, Config)).
+    [?assertEqual(ok, application:stop(App)) || App <- ?config(apps, Config)].
 
 init_per_testcase(_, Config) ->
-    % the kraf instance links to this process
-    process_flag(trap_exit, true),
-    {ok, _} = application:ensure_all_started(kraft),
-    KraftRef = grisp_connect_manager:kraft_start(?config(cert_dir, Config)),
+    start_cowboy(cert_dir()),
     {ok, _} = application:ensure_all_started(grisp_emulation),
-    application:set_env(grisp_connect, ws_ping_timeout, 60_000),
+    application:set_env(grisp_connect, ws_ping_timeout, 120_000),
     {ok, _} = application:ensure_all_started(grisp_connect),
-    [{kraft_instance, KraftRef} | Config].
+    Config.
 
 end_per_testcase(_, Config) ->
     ok = application:stop(grisp_connect),
-    kraft:stop(?config(kraft_instance, Config)),
-    ok = application:stop(kraft),
-    mnesia:activity(transaction, fun() ->
-        mnesia:delete({grisp_device, serial_number()})
-    end),
+    stop_cowboy(),
     flush(),
     Config.
 
@@ -68,11 +59,11 @@ reconnect_on_gun_crash_test(_) ->
 
 reconnect_on_disconnection_test(Config) ->
     ?assertMatch(ok, wait_connection()),
-    ok = kraft:stop(?config(kraft_instance, Config)),
+    stop_cowboy(),
     ?assertMatch(ok, wait_disconnection()),
-    KraftRef2 = grisp_connect_manager:kraft_start(cert_dir()),
+    start_cowboy(cert_dir()),
     ?assertMatch(ok, wait_connection(100)),
-    [{kraft_instance, KraftRef2} | proplists:delete(kraft_instance, Config)].
+    Config.
 
 reconnect_on_ping_timeout_test(_) ->
     ?assertMatch(ok, wait_connection()),
@@ -88,25 +79,6 @@ reconnect_on_ping_timeout_test(_) ->
 
 reconnect_on_closed_frame_test(_) ->
     ?assertMatch(ok, wait_connection()),
-    % Delete a table to cause an internal crash, this is handled by cowboy
-    % and generates a close frame,
-    % triggering a normal exit from gun on the client
-    mnesia:delete_table(grisp_manager_token),
-    TestProc = self(),
-    spawn(fun() ->
-        Result = grisp_connect:link_device(<<"">>),
-        TestProc ! Result
-    end),
+    close_websocket(),
     ?assertMatch(ok, wait_disconnection()),
-    ?assertMatch(ok, wait_connection(100)),
-    receive
-        {error, timeout} -> ok
-        after 5000 -> error(timeout_not_reached)
-    end.
-
-%--- Internal ------------------------------------------------------------------
-
-flush() ->
-    receive Any -> ct:pal("Flushed: ~p", [Any]), flush()
-    after 0 -> ok
-    end.
+    ?assertMatch(ok, wait_connection(100)).
