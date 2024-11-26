@@ -1,7 +1,10 @@
 -module(grisp_connect_test_server).
 
+-include_lib("stdlib/include/assert.hrl").
+
 % API
 -export([start/0, start/1]).
+-export([stop/1]).
 -export([start_cowboy/0, start_cowboy/1]).
 -export([stop_cowboy/0]).
 -export([close_websocket/0]).
@@ -42,6 +45,13 @@ start(CertDir) ->
     % TODO: Disable ssl for testing
     start_cowboy(CertDir),
     Apps.
+
+stop(Apps) ->
+    ?assertEqual(ok, stop_cowboy()),
+    [?assertEqual(ok, application:stop(App)) || App <- Apps],
+    % Ensure the process is unregistered...
+    wait_no_websocket().
+
 
 % Start the cowboy listener.
 % You have to make sure cowboy is running before.
@@ -203,3 +213,14 @@ websocket_info(close_websocket, State) ->
 websocket_info(Info, State) ->
     ct:pal("Ignore websocket info:~n~p", [Info]),
     {[], State}.
+
+
+%--- Internal Functions --------------------------------------------------------
+
+wait_no_websocket() ->
+    case whereis(?MODULE) of
+        undefined -> ok;
+        _Pid ->
+            timer:sleep(200),
+            wait_no_websocket()
+    end.
