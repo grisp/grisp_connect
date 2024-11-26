@@ -12,7 +12,7 @@
 
 %--- API -----------------------------------------------------------------------
 
-cert_dir() -> filename:join(code:lib_dir(grisp_connect, test), "certs").
+cert_dir() -> filename:join([code:lib_dir(grisp_connect), "test", "certs"]).
 
 serial_number() -> <<"0000">>.
 
