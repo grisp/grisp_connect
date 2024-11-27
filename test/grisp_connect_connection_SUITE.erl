@@ -88,6 +88,7 @@ init_per_testcase(_TestCase, Config) ->
     Config.
 
 end_per_testcase(_, Config) ->
+    grisp_connect_test_server:wait_disconnection(),
     ?assertEqual([], flush()),
     Config.
 

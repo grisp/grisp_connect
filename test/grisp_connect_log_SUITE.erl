@@ -50,6 +50,7 @@ end_per_testcase(log_level_test, Config) ->
     end_per_testcase(other, Config);
 end_per_testcase(_, Config) ->
     ok = application:stop(grisp_connect),
+    grisp_connect_test_server:wait_disconnection(),
     ?assertEqual([], flush()),
     Config.
 

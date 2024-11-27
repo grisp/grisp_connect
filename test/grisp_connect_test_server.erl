@@ -21,6 +21,7 @@
 -export([send_jsonrpc_request/3]).
 -export([send_jsonrpc_result/2]).
 -export([send_jsonrpc_error/3]).
+-export([wait_disconnection/0]).
 
 % Websocket Callbacks
 -export([init/2]).
@@ -50,7 +51,7 @@ stop(Apps) ->
     ?assertEqual(ok, stop_cowboy()),
     [?assertEqual(ok, application:stop(App)) || App <- Apps],
     % Ensure the process is unregistered...
-    wait_no_websocket().
+    wait_disconnection().
 
 
 % Start the cowboy listener.
@@ -186,6 +187,15 @@ send_jsonrpc_error(Code, Msg, Id) ->
             id => Id},
     send_text(jsx:encode(Map)).
 
+wait_disconnection() ->
+    case whereis(?MODULE) of
+        undefined -> ok;
+        _Pid ->
+            timer:sleep(200),
+            wait_disconnection()
+    end.
+
+
 %--- Websocket Callbacks -------------------------------------------------------
 
 init(Req, State) ->
@@ -213,14 +223,3 @@ websocket_info(close_websocket, State) ->
 websocket_info(Info, State) ->
     ct:pal("Ignore websocket info:~n~p", [Info]),
     {[], State}.
-
-
-%--- Internal Functions --------------------------------------------------------
-
-wait_no_websocket() ->
-    case whereis(?MODULE) of
-        undefined -> ok;
-        _Pid ->
-            timer:sleep(200),
-            wait_no_websocket()
-    end.
