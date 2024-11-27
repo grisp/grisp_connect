@@ -308,7 +308,7 @@ conn_close(Data = #data{conn = undefined}, _Reason) ->
     Data;
 conn_close(Data = #data{conn = Conn}, _Reason) ->
     grisp_connect_log_server:stop(),
-    catch grisp_connect_connection:disconnect(Conn),
+    grisp_connect_connection:disconnect(Conn),
     Data#data{conn = undefined}.
 
 % Safe to call in any state
@@ -323,25 +323,20 @@ conn_post(Data = #data{conn = Conn}, Method, Type, Params, OnResult, OnError)
   when Conn =/= undefined ->
     ReqCtx = #{on_result => OnResult, on_error => OnError},
     Params2 = maps:put(type, Type, Params),
-    try grisp_connect_connection:post(Conn, Method, Params2, ReqCtx) of
-        _ -> Data
-    catch
-        _:Reason when OnError =/= undefined ->
-            OnError(Data, local, Reason, undefined, undefined);
-        _:_ ->
-            Data
+    case grisp_connect_connection:post(Conn, Method, Params2, ReqCtx) of
+        ok -> Data;
+        {error, Reason} ->
+            OnError(Data, local, Reason, undefined, undefined)
     end.
 
 conn_notify(#data{conn = Conn}, Method, Type, Params)
   when Conn =/= undefined ->
     Params2 = maps:put(type, Type, Params),
-    catch grisp_connect_connection:notify(Conn, Method, Params2),
-    ok.
+    grisp_connect_connection:notify(Conn, Method, Params2).
 
 conn_reply(#data{conn = Conn}, Result, ReqRef)
   when Conn =/= undefined ->
-    catch grisp_connect_connection:reply(Conn, Result, ReqRef),
-    ok.
+    grisp_connect_connection:reply(Conn, Result, ReqRef).
 
 % IP check functions
 

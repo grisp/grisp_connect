@@ -128,36 +128,44 @@ start_link(Handler, Opts = #{domain := _, port := _, path := _}) ->
     | {error, Code :: integer(),
               Message :: undefined | binary(), Data :: term()}.
 request(Conn, Method, Params) ->
-    case gen_server:call(Conn, {request, parse_method(Method), Params}) of
+    try gen_server:call(Conn, {request, parse_method(Method), Params}) of
         {exception, Class, Reason, Stack} -> erlang:raise(Class, Reason, Stack);
         Other -> Other
+    catch
+        exit:{noproc, _} -> {error, not_connected}
     end.
 
 -spec post(Conn :: pid(), Method :: method(), Params :: map(),
            ReqCtx :: term()) -> ok | {error, not_connected}.
 post(Conn, Method, Params, ReqCtx) ->
-    case gen_server:call(Conn, {post, parse_method(Method), Params, ReqCtx}) of
+    try gen_server:call(Conn, {post, parse_method(Method), Params, ReqCtx}) of
         {ok, CallResult} -> CallResult;
         {error, _Reason} = Error -> Error;
         {exception, Class, Reason, Stack} -> erlang:raise(Class, Reason, Stack)
+    catch
+        exit:{noproc, _} -> {error, not_connected}
     end.
 
 -spec notify(Conn :: pid(), Method :: method(), Params :: map()) ->
     ok | {error, not_connected}.
 notify(Conn, Method, Params) ->
-    case gen_server:call(Conn, {notify, parse_method(Method), Params}) of
+    try gen_server:call(Conn, {notify, parse_method(Method), Params}) of
         {ok, CallResult} -> CallResult;
         {error, _Reason} = Error -> Error;
         {exception, Class, Reason, Stack} -> erlang:raise(Class, Reason, Stack)
+    catch
+        exit:{noproc, _} -> {error, not_connected}
     end.
 
 -spec reply(Conn :: pid(), Result :: any(), ReqRef :: binary()) ->
     ok | {error, not_connected}.
 reply(Conn, Result, ReqRef) ->
-    case gen_server:call(Conn, {reply, Result, ReqRef}) of
+    try gen_server:call(Conn, {reply, Result, ReqRef}) of
         {ok, CallResult} -> CallResult;
         {error, _Reason} = Error -> Error;
         {exception, Class, Reason, Stack} -> erlang:raise(Class, Reason, Stack)
+    catch
+        exit:{noproc, _} -> {error, not_connected}
     end.
 
 -spec error(Conn :: pid(), Code :: atom() | integer(),
@@ -165,15 +173,20 @@ reply(Conn, Result, ReqRef) ->
             ReqRef :: undefined | binary()) ->
     ok | {error, not_connected}.
 error(Conn, Code, Message, Data, ReqRef) ->
-    case gen_server:call(Conn, {error, Code, Message, Data, ReqRef}) of
+    try gen_server:call(Conn, {error, Code, Message, Data, ReqRef}) of
         {ok, CallResult} -> CallResult;
         {error, _Reason} = Error -> Error;
         {exception, Class, Reason, Stack} -> erlang:raise(Class, Reason, Stack)
+    catch
+        exit:{noproc, _} -> {error, not_connected}
     end.
 
 -spec disconnect(Conn :: pid()) -> ok.
 disconnect(Conn) ->
-    gen_server:call(Conn, disconnect).
+    try gen_server:call(Conn, disconnect)
+    catch
+        exit:{noproc, _} -> ok
+    end.
 
 
 %--- Behaviour gen_server Callbacks --------------------------------------------
