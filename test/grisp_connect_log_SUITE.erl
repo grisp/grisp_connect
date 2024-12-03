@@ -61,7 +61,7 @@ string_logs_test(_) ->
     S2 = <<"@#$%^&*()_ +{}|:\"<>?-[];'./,\\`~!\néäüßóçøáîùêñÄÖÜÉÁÍÓÚàèìòùÂÊÎÔÛ€"/utf8>>,
     Strings = [S1, S2],
     Texts = [<<S2/binary>>, <<S2/binary>>],
-    LastSeq = reset_log(last_seq()),
+    LastSeq = last_seq(),
     Seqs = [LastSeq + 1, LastSeq + 2],
     Fun = fun({Seq, String, Text}) ->
                   grisp_connect:log(error, [String]),
@@ -80,7 +80,7 @@ formatted_logs_test(_) ->
              <<"<<\"tést\">>, <<\"tést\"/utf8>>"/utf8>>,
              <<"tést, tést"/utf8>>,
              <<"tést, tést"/utf8>>],
-    LastSeq = reset_log(last_seq()),
+    LastSeq = last_seq(),
     Seqs = lists:seq(LastSeq + 1, LastSeq + length(ArgsList)),
     Fun = fun({Seq, Args, Text}) ->
                   grisp_connect:log(error, Args),
@@ -107,7 +107,7 @@ structured_logs_test(_) ->
              #{event => 1234},
              #{event => 0.1},
              <<"[JSON incompatible term]\n#{event => {äh,bäh}}"/utf8>>],
-    LastSeq = reset_log(last_seq()),
+    LastSeq = last_seq(),
     Seqs = lists:seq(LastSeq + 1, LastSeq + length(Events)),
     Fun = fun({Seq, Event, Text}) ->
                   grisp_connect:log(error, [Event]),
@@ -124,7 +124,7 @@ log_level_test(_) ->
               notice,
               info,
               debug],
-    LastSeq = reset_log(last_seq()),
+    LastSeq = last_seq(),
     Seqs = lists:seq(LastSeq + 1, LastSeq + length(Levels)),
     Fun = fun({Seq, Level}) ->
                   grisp_connect:log(Level, ["level test"]),
@@ -148,7 +148,7 @@ meta_data_test(_) ->
              custom5 => #{boolean => true},
              custom6 => 6,
              custom7 => 7.0},
-    LastSeq = reset_log(last_seq()),
+    LastSeq = last_seq(),
     Seq = LastSeq + 1,
     grisp_connect:log(error, ["Test meta", Meta]),
     send_logs(),
@@ -187,10 +187,9 @@ last_seq() ->
     Events = maps:get(events, maps:get(params, Send)),
     [Seq, _] = lists:last(Events),
     send_jsonrpc_result(#{seq => Seq, dropped => 0}, Id),
-    Seq.
+    % Consume all the log events, updating the sequence number
+    reset_log(Seq).
 
-reset_log() ->
-    reset_log(undefined).
 
 reset_log(LasSeq) ->
     send_logs(),

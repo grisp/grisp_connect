@@ -85,9 +85,12 @@ end_per_suite(Config) ->
 
 init_per_testcase(_TestCase, Config) ->
     {ok, _} = application:ensure_all_started(grisp_emulation),
-    Config.
+    Conn = connect(),
+    [{conn, Conn} | Config].
 
-end_per_testcase(_, Config) ->
+end_per_testcase(_TestCase, Config) ->
+    Conn = proplists:get_value(conn, Config),
+    disconnect(Conn),
     grisp_connect_test_server:wait_disconnection(),
     ?assertEqual([], flush()),
     Config.
@@ -95,28 +98,28 @@ end_per_testcase(_, Config) ->
 
 %--- Tests ---------------------------------------------------------------------
 
-basic_server_notifications_test(_) ->
-    Conn = connect(),
+basic_server_notifications_test(Config) ->
+    Conn = proplists:get_value(conn, Config),
     send_jsonrpc_notification(<<"ping">>, #{foo => null}),
     ?assertConnNotification(Conn, [ping], #{foo := undefined}),
     send_jsonrpc_notification(<<"foo.bar.ping">>, #{}),
     ?assertConnNotification(Conn, [foo, bar, ping], _),
     send_jsonrpc_notification(<<"foo.bar.NotAnAtom">>, #{}),
     ?assertConnNotification(Conn, [foo, bar, <<"NotAnAtom">>], _),
-    disconnect(Conn).
+    ok.
 
-basic_client_notifications_test(_) ->
-    Conn = connect(),
+basic_client_notifications_test(Config) ->
+    Conn = proplists:get_value(conn, Config),
     grisp_connect_connection:notify(Conn, ping, #{foo => undefined}),
     ?receiveNotification(<<"ping">>, #{foo := null}),
     grisp_connect_connection:notify(Conn, [foo, bar, ping], #{}),
     ?receiveNotification(<<"foo.bar.ping">>, _),
     grisp_connect_connection:notify(Conn, [foo, bar, <<"NotAnAtom">>], #{}),
     ?receiveNotification(<<"foo.bar.NotAnAtom">>, _),
-    disconnect(Conn).
+    ok.
 
-basic_server_request_test(_) ->
-    Conn = connect(),
+basic_server_request_test(Config) ->
+    Conn = proplists:get_value(conn, Config),
     send_jsonrpc_request(<<"toto">>, #{}, 1),
     ?assertConnRequest(Conn, [toto], _, 1),
     grisp_connect_connection:reply(Conn, <<"spam">>, 1),
@@ -133,10 +136,10 @@ basic_server_request_test(_) ->
     ?assertConnRequest(Conn, [foo, bar, titi], _, 4),
     grisp_connect_connection:error(Conn, -42, <<"Message">>, undefined, 4),
     ?receiveError(-42, <<"Message">>, 4),
-    disconnect(Conn).
+    ok.
 
-basic_client_synchronous_request_test(_) ->
-    Conn = connect(),
+basic_client_synchronous_request_test(Config) ->
+    Conn = proplists:get_value(conn, Config),
     Async1 = async_eval(fun() -> grisp_connect_connection:request(Conn, [toto], #{}) end),
     Id1 = ?receiveRequest(<<"toto">>, _),
     send_jsonrpc_result(<<"spam">>, Id1),
@@ -149,10 +152,10 @@ basic_client_synchronous_request_test(_) ->
     Id3 = ?receiveRequest(<<"titi">>, _),
     send_jsonrpc_error(-2, <<"Custom">>, Id3),
     ?assertEqual({remote_error, error2, <<"Custom">>, undefined}, async_get_result(Async3)),
-    disconnect(Conn).
+    ok.
 
-basic_client_asynchronous_request_test(_) ->
-    Conn = connect(),
+basic_client_asynchronous_request_test(Config) ->
+    Conn = proplists:get_value(conn, Config),
     grisp_connect_connection:post(Conn, toto, #{}, ctx1),
     Id1 = ?receiveRequest(<<"toto">>, _),
     send_jsonrpc_result(<<"spam">>, Id1),
@@ -165,29 +168,29 @@ basic_client_asynchronous_request_test(_) ->
     Id3 = ?receiveRequest(<<"titi">>, _),
     send_jsonrpc_error(-2, <<"Custom">>, Id3),
     ?assertConnRemoteError(Conn, error2, <<"Custom">>, undefined, ctx3),
-    disconnect(Conn).
+    ok.
 
-basic_error_test(_) ->
-    Conn = connect(),
+basic_error_test(Config) ->
+    Conn = proplists:get_value(conn, Config),
     grisp_connect_connection:error(Conn, -1, undefined, undefined, undefined),
     ?receiveError(-1, <<"Error Number 1">>, null),
     send_jsonrpc_error(-2, null, null),
     ?assertConnRemoteError(Conn, error2, <<"Error Number 2">>, undefined),
-    disconnect(Conn).
+    ok.
 
-request_timeout_test(_) ->
-    Conn = connect(),
+request_timeout_test(Config) ->
+    Conn = proplists:get_value(conn, Config),
     grisp_connect_connection:post(Conn, toto, #{}, ctx1),
     _Id1 = ?receiveRequest(<<"toto">>, _),
     timer:sleep(500),
     ?assertConnLocalError(Conn, timeout, ctx1),
-    disconnect(Conn).
+    ok.
 
 spec_example_test(Config) ->
     DataDir = proplists:get_value(data_dir, Config),
     ExamplesFile = filename:join(DataDir, "jsonrpc_examples.txt"),
 
-    Conn = connect(),
+    Conn = proplists:get_value(conn, Config),
 
     {ok, ExData} = file:read_file(ExamplesFile),
     Examples = parse_examples(ExData),
@@ -223,7 +226,7 @@ spec_example_test(Config) ->
         end
     end, Examples),
 
-    disconnect(Conn).
+    ok.
 
 
 %--- Internal Functions --------------------------------------------------------
