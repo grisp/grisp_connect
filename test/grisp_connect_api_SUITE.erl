@@ -37,7 +37,7 @@ init_per_suite(Config) ->
     [{apps, Apps} | Config].
 
 end_per_suite(Config) ->
-    [?assertEqual(ok, application:stop(App)) || App <- ?config(apps, Config)].
+    grisp_connect_test_server:stop(?config(apps, Config)).
 
 init_per_testcase(TestCase, Config) ->
     {ok, _} = application:ensure_all_started(grisp_emulation),
@@ -52,6 +52,7 @@ init_per_testcase(TestCase, Config) ->
 
 end_per_testcase(_, Config) ->
     ok = application:stop(grisp_connect),
+    grisp_connect_test_server:wait_disconnection(),
     ?assertEqual([], flush()),
     Config.
 

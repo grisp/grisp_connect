@@ -1,18 +1,27 @@
 -module(grisp_connect_test_server).
 
+-include_lib("stdlib/include/assert.hrl").
+
 % API
--export([start/1]).
--export([start_cowboy/1]).
+-export([start/0, start/1]).
+-export([stop/1]).
+-export([start_cowboy/0, start_cowboy/1]).
 -export([stop_cowboy/0]).
 -export([close_websocket/0]).
 -export([listen/0]).
 -export([flush/0]).
--export([receive_text/0]).
--export([receive_jsonrpc/0]).
--export([receive_jsonrpc_request/0]).
+-export([receive_text/0, receive_text/1]).
+-export([receive_jsonrpc/0, receive_jsonrpc/1]).
+-export([receive_jsonrpc_request/0, receive_jsonrpc_request/1]).
+-export([receive_jsonrpc_notification/0]).
+-export([receive_jsonrpc_result/0]).
+-export([receive_jsonrpc_error/0]).
 -export([send_text/1]).
+-export([send_jsonrpc_notification/2]).
+-export([send_jsonrpc_request/3]).
 -export([send_jsonrpc_result/2]).
 -export([send_jsonrpc_error/3]).
+-export([wait_disconnection/0]).
 
 % Websocket Callbacks
 -export([init/2]).
@@ -27,14 +36,32 @@
 % Start the cowboy application and server,
 % call this in `init_per_suite'.
 % Returns the started apps
+start() ->
+    {ok, Apps} = application:ensure_all_started(cowboy),
+    start_cowboy(),
+    Apps.
+
 start(CertDir) ->
     {ok, Apps} = application:ensure_all_started(cowboy),
     % TODO: Disable ssl for testing
     start_cowboy(CertDir),
     Apps.
 
+stop(Apps) ->
+    ?assertEqual(ok, stop_cowboy()),
+    [?assertEqual(ok, application:stop(App)) || App <- Apps],
+    % Ensure the process is unregistered...
+    wait_disconnection().
+
+
 % Start the cowboy listener.
 % You have to make sure cowboy is running before.
+start_cowboy() ->
+    Dispatch = cowboy_router:compile(
+        [{'_', [{"/grisp-connect/ws", grisp_connect_test_server, []}]}]),
+    {ok, _} = cowboy:start_clear(server_listener, [{port, 3030}],
+                                 #{env => #{dispatch => Dispatch}}).
+
 start_cowboy(CertDir) ->
     SslOpts = [
         {verify, verify_peer},
@@ -77,32 +104,76 @@ flush(Acc) ->
     end.
 
 receive_text() ->
+    receive_text(5000).
+
+receive_text(Timeout) ->
     receive {received_text, Msg} -> Msg
-    after 5000 -> {error, timeout}
+    after Timeout -> error(timeout)
     end.
 
 receive_jsonrpc() ->
-    case receive_text() of
-        {error, _} = Error -> Error;
-        Msg -> check_jsonrpc(Msg)
-    end.
+    check_jsonrpc(receive_text()).
+
+receive_jsonrpc(Timeout) ->
+    check_jsonrpc(receive_text(Timeout)).
 
 receive_jsonrpc_request() ->
     case receive_jsonrpc() of
-        {error, _} = Error -> Error;
-        {error, _, _} = Error -> Error;
         #{id := _} = Decoded -> Decoded;
-        Decoded -> {error, invalid_jsonrpc_request, Decoded}
+        Decoded -> error({invalid_jsonrpc_request, Decoded})
+    end.
+
+receive_jsonrpc_request(Timeout) ->
+    case receive_jsonrpc(Timeout) of
+        #{id := _} = Decoded -> Decoded;
+        Decoded -> error({invalid_jsonrpc_request, Decoded})
+    end.
+
+receive_jsonrpc_notification() ->
+    case receive_jsonrpc() of
+        #{method := _} = Decoded -> Decoded;
+        Decoded -> error({invalid_jsonrpc_notification, Decoded})
+    end.
+
+receive_jsonrpc_result() ->
+    case receive_jsonrpc() of
+        #{result := _} = Decoded -> Decoded;
+        Decoded -> error({invalid_jsonrpc_result, Decoded})
+    end.
+
+receive_jsonrpc_error() ->
+    case receive_jsonrpc() of
+        #{error := _} = Decoded -> Decoded;
+        Decoded -> error({invalid_jsonrpc_error, Decoded})
     end.
 
 check_jsonrpc(Msg) ->
     case jsx:decode(Msg, [{labels, attempt_atom}, return_maps]) of
         #{jsonrpc := <<"2.0">>} = Decoded -> Decoded;
-        _ -> {error, invalid_jsonrpc, Msg}
+        Batch when is_list(Batch) ->
+            lists:foreach(fun
+                (#{jsonrpc := <<"2.0">>}) -> ok;
+                (_) -> error({invalid_jsonrpc, Msg})
+            end, Batch),
+            Batch;
+        _ -> error({invalid_jsonrpc, Msg})
     end.
 
 send_text(Msg) ->
     ?MODULE ! {?FUNCTION_NAME, Msg}.
+
+send_jsonrpc_notification(Method, Params) ->
+    Map = #{jsonrpc => <<"2.0">>,
+            method => Method,
+            params => Params},
+    send_text(jsx:encode(Map)).
+
+send_jsonrpc_request(Method, Params, Id) ->
+    Map = #{jsonrpc => <<"2.0">>,
+            method => Method,
+            params => Params,
+            id => Id},
+    send_text(jsx:encode(Map)).
 
 send_jsonrpc_result(Result, Id) ->
     Map = #{jsonrpc => <<"2.0">>,
@@ -115,6 +186,15 @@ send_jsonrpc_error(Code, Msg, Id) ->
             error => #{code => Code, message => Msg},
             id => Id},
     send_text(jsx:encode(Map)).
+
+wait_disconnection() ->
+    case whereis(?MODULE) of
+        undefined -> ok;
+        _Pid ->
+            timer:sleep(200),
+            wait_disconnection()
+    end.
+
 
 %--- Websocket Callbacks -------------------------------------------------------
 

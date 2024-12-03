@@ -15,6 +15,13 @@
 -export([validate/0]).
 -export([cancel/0]).
 
+% Disable dialyzer warnings because of unknown dependencies
+-dialyzer({nowarn_function, system_info/0}).
+-dialyzer({nowarn_function, start_update/1}).
+-dialyzer({nowarn_function, validate/0}).
+-dialyzer({nowarn_function, cancel/0}).
+-dialyzer({nowarn_function, update_info/0}).
+
 
 %--- API -----------------------------------------------------------------------
 

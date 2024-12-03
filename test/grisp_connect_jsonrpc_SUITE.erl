@@ -72,18 +72,18 @@ invalid_json(_) ->
                             <<"\"id\":null">>], JsonError)).
 
 invalid_request(_) ->
-    Term = {decoding_error, -32600, <<"Invalid request">>, undefined, undefined},
+    Term = {decoding_error, -32600, <<"Invalid Request">>, undefined, undefined},
     Json = <<"{\"jsonrpc\":\"2.0\",\"method\":1,\"params\":\"bar\"}">>,
     ?assertMatch(Term, grisp_connect_jsonrpc:decode(Json)),
     JsonError = grisp_connect_jsonrpc:encode(Term),
     ?assert(jsonrpc_check([<<"\"error\":{">>,
                            <<"\"code\":-32600">>,
-                           <<"\"message\":\"Invalid request\"">>,
+                           <<"\"message\":\"Invalid Request\"">>,
                            <<"\"id\":null">>], JsonError)).
 
 batch(_) ->
     Term1 = {request, <<"sum">>, [1,2,4], <<"1">>},
-    Term2 = {decoding_error, -32600, <<"Invalid request">>, undefined, undefined},
+    Term2 = {decoding_error, -32600, <<"Invalid Request">>, undefined, undefined},
     Json = <<"[{\"jsonrpc\":\"2.0\",\"method\":\"sum\",\"params\":[1,2,4],\"id\":\"1\"},{\"foo\":\"boo\"}]">>,
     ?assertMatch([Term1, Term2], grisp_connect_jsonrpc:decode(Json)),
     JsonError = grisp_connect_jsonrpc:encode([Term1, Term2]),
@@ -92,7 +92,7 @@ batch(_) ->
                            <<"\"params\":[1,2,4]">>,
                            <<"\"error\":{">>,
                            <<"\"code\":-32600">>,
-                           <<"\"message\":\"Invalid request\"">>,
+                           <<"\"message\":\"Invalid Request\"">>,
                            <<"\"id\":null">>], JsonError)).
 
 result(_) ->

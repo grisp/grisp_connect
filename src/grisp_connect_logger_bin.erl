@@ -34,9 +34,6 @@
 -export([handle_info/3]).
 -export([terminate/3]).
 
-% % Log filtering functions
--export([filter_out/2]).
-
 % Internal Callbacks
 -export([queue_ctrl_init/1]).
 -export([queue_ctrl_loop/1]).
@@ -150,26 +147,6 @@ handle_info(_, _, State) ->
 terminate(_Name, _Reason, _State) ->
     ok.
 
-% %--- Log Filtering Functions ---------------------------------------------------
-
-filter_out(LogEvent = #{meta := Meta}, Mfa = {M, F, A})
-  when is_atom(M), is_atom(F), is_integer(A) ->
-    case Meta of
-        #{mfa := Mfa} -> stop;
-        _ -> LogEvent
-    end;
-filter_out(LogEvent = #{meta := Meta}, {M, F})
-  when is_atom(M), is_atom(F) ->
-    case Meta of
-        #{mfa := {M, F, _}} -> stop;
-        _ -> LogEvent
-    end;
-filter_out(LogEvent = #{meta := Meta}, M)
-  when is_atom(M) ->
-    case Meta of
-        #{mfa := {M, _, _}} -> stop;
-        _ -> LogEvent
-    end.
 
 %--- Internal ------------------------------------------------------------------
 
