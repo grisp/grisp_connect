@@ -7,10 +7,10 @@
         kernel,
         inets,
         stdlib,
+        jsx,
+        jarl,
         grisp,
         grisp_cryptoauth,
-        gun,
-        jsx,
         certifi
     ]},
     {optional_applications, [

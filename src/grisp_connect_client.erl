@@ -7,9 +7,7 @@
 
 -behaviour(gen_statem).
 
--include("grisp_connect_internal.hrl").
-
--import(grisp_connect_utils, [as_bin/1]).
+-include_lib("kernel/include/logger.hrl").
 
 % External API
 -export([start_link/0]).
@@ -52,6 +50,7 @@
 
 %--- Macros --------------------------------------------------------------------
 
+-define(FORMAT(FMT, ARGS), iolist_to_binary(io_lib:format(FMT, ARGS))).
 -define(STD_TIMEOUT, 1000).
 -define(CONNECT_TIMEOUT, 2000).
 -define(ENV(KEY, GUARDS), fun() ->
@@ -162,7 +161,8 @@ connecting(enter, _OldState, Data) ->
     {keep_state, Data, [{state_timeout, 0, connect}]};
 connecting(state_timeout, connect,
            Data = #data{conn = undefined, retry_count = RetryCount}) ->
-    ?GRISP_INFO("Connecting to grisp.io", [], #{event => connecting}),
+    ?LOG_INFO(#{description => <<"Connecting to grisp.io">>,
+                event => connecting}),
     case conn_start(Data) of
         {ok, Data2} ->
             {keep_state, Data2, [{state_timeout, ?CONNECT_TIMEOUT, timeout}]};
@@ -173,13 +173,14 @@ connecting(state_timeout, connect,
     end;
 connecting(state_timeout, timeout, Data = #data{retry_count = RetryCount}) ->
     Reason = connect_timeout,
-    ?GRISP_WARN("Timeout while connecting to grisp.io", [],
-                #{event => connection_failed, reason => Reason}),
+    ?LOG_WARNING(#{description => <<"Timeout while connecting to grisp.io">>,
+                   event => connection_failed, reason => Reason}),
     Data2 = conn_close(Data, Reason),
     {next_state, waiting_ip, Data2#data{retry_count = RetryCount + 1}};
 connecting(info, {conn, Conn, connected}, Data = #data{conn = Conn}) ->
     % Received from the connection process
-    ?GRISP_INFO("Connected to grisp.io", [], #{event => connected}),
+    ?LOG_INFO(#{description => <<"Connected to grisp.io">>,
+                event => connected}),
     {next_state, connected, Data#data{retry_count = 0}};
 ?HANDLE_COMMON.
 
@@ -217,8 +218,9 @@ handle_common(info, reboot, _, _) ->
 handle_common(info, {'EXIT', Conn, Reason}, _State,
               Data = #data{conn = Conn, retry_count = RetryCount}) ->
     % The connection process died
-    ?GRISP_WARN("The connection to grisp.io died: ~p", [Reason],
-                #{event => connection_failed, reason => Reason}),
+    ?LOG_WARNING(#{description =>
+                    ?FORMAT("The connection to grisp.io died: ~p", [Reason]),
+                   event => connection_failed, reason => Reason}),
     {next_state, waiting_ip, conn_died(Data#data{retry_count = RetryCount + 1})};
 handle_common(info, {conn, Conn, Msg}, State, _Data) ->
     ?LOG_DEBUG("Received message from unknown connection ~p in state ~w: ~p",
@@ -247,6 +249,10 @@ generic_errors() -> [
     {boot_system_not_validated, -12, <<"Boot system not validated">>},
     {validate_from_unbooted,    -13, <<"Validate from unbooted">>}
 ].
+
+as_bin(Binary) when is_binary(Binary) -> Binary;
+as_bin(List) when is_list(List) -> list_to_binary(List);
+as_bin(Atom) when is_atom(Atom) -> atom_to_binary(Atom).
 
 handle_connection_message(_Data, {response, _Result, #{on_result := undefined}}) ->
     keep_state_and_data;
@@ -298,7 +304,7 @@ conn_start(Data = #data{conn = undefined,
         ping_timeout => WsPingTimeout,
         request_timeout => WsReqTimeout
     },
-    case grisp_connect_connection:start_link(self(), ConnOpts) of
+    case jarl:start_link(self(), ConnOpts) of
         {error, _Reason} = Error -> Error;
         {ok, Conn} -> {ok, Data#data{conn = Conn}}
     end.
@@ -308,7 +314,7 @@ conn_close(Data = #data{conn = undefined}, _Reason) ->
     Data;
 conn_close(Data = #data{conn = Conn}, _Reason) ->
     grisp_connect_log_server:stop(),
-    grisp_connect_connection:disconnect(Conn),
+    jarl:disconnect(Conn),
     Data#data{conn = undefined}.
 
 % Safe to call in any state
@@ -316,14 +322,14 @@ conn_died(Data) ->
     grisp_connect_log_server:stop(),
     Data#data{conn = undefined}.
 
--spec conn_post(data(), grisp_connect_connection:method(), atom(), map(),
+-spec conn_post(data(), jarl:method(), atom(), map(),
                 undefined | on_result_fun(), undefined | on_error_fun())
     -> data().
 conn_post(Data = #data{conn = Conn}, Method, Type, Params, OnResult, OnError)
   when Conn =/= undefined ->
     ReqCtx = #{on_result => OnResult, on_error => OnError},
     Params2 = maps:put(type, Type, Params),
-    case grisp_connect_connection:post(Conn, Method, Params2, ReqCtx) of
+    case jarl:post(Conn, Method, Params2, ReqCtx) of
         ok -> Data;
         {error, Reason} ->
             OnError(Data, local, Reason, undefined, undefined)
@@ -332,11 +338,11 @@ conn_post(Data = #data{conn = Conn}, Method, Type, Params, OnResult, OnError)
 conn_notify(#data{conn = Conn}, Method, Type, Params)
   when Conn =/= undefined ->
     Params2 = maps:put(type, Type, Params),
-    grisp_connect_connection:notify(Conn, Method, Params2).
+    jarl:notify(Conn, Method, Params2).
 
 conn_reply(#data{conn = Conn}, Result, ReqRef)
   when Conn =/= undefined ->
-    grisp_connect_connection:reply(Conn, Result, ReqRef).
+    jarl:reply(Conn, Result, ReqRef).
 
 % IP check functions
 

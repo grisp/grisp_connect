@@ -15,9 +15,8 @@ individual JSON-RPC requests changed from ws_requests_timeout ot
 ws_request_timeout.
 - Le default log filter changed to trying to filter out only some messages to
 filtering out all progress messages, as it wasn't working reliably.
-- The connection is not a persistent process anymore, it is now a transiant
-process handling a connection and dying when the connection is closed.
-- Internally, the JSON-RPC is parsed into a list of atom or binaries to pave the
+- JSON-RPC logic was extracted into the jarl library.
+- Jarl parses the methods into a list of atom or binaries to pave the
 road for namespaces. foo.bar.Buz is parsed into [foo, bar, <<"Buz">>] (if foo
 and bar are already existing atoms, but 'Buz' is not).
 

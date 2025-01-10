@@ -15,8 +15,8 @@
 % @doc Handles requests, notifications and errors from grisp.io.
 -spec handle_msg(Msg) ->
     ok | {reply, Result :: term(), ReqRef :: binary() | integer()}
-  when Msg :: {request, Method :: grisp_connect_connection:method(), Params :: map() | list(), ReqRef :: binary() | integer()}
-            | {notification, grisp_connect_connection:method(), Params :: map() | list()}
+  when Msg :: {request, Method :: jarl:method(), Params :: map() | list(), ReqRef :: binary() | integer()}
+            | {notification, jarl:method(), Params :: map() | list()}
             | {remote_error, Code :: integer() | atom(), Message :: undefined | binary(), Data :: term()}.
 handle_msg({notification, M, Params}) ->
     ?LOG_ERROR("Received unexpected notification ~p: ~p", [M, Params]),
