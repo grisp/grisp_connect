@@ -241,7 +241,7 @@ handle_common(info, Info, State, Data) ->
 %--- Internal Functions --------------------------------------------------------
 
 generic_errors() -> [
-    {device_not_linked,          -1, <<"Device no linked">>},
+    {device_not_linked,          -1, <<"Device not linked">>},
     {token_expired,              -2, <<"Token expired">>},
     {device_already_linked,      -3, <<"Device already linked">>},
     {invalid_token,              -4, <<"Invalid token">>},

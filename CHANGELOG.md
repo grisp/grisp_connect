@@ -10,8 +10,8 @@ and this project adheres to
 
 ### Changed
 
-- The name of the grisp_connect configuration key to control the timout of
-individual JSON-RPC requests changed from ws_requests_timeout ot
+- The name of the grisp_connect configuration key to control the timeout of
+individual JSON-RPC requests changed from ws_requests_timeout to
 ws_request_timeout.
 - Le default log filter changed to trying to filter out only some messages to
 filtering out all progress messages, as it wasn't working reliably.
@@ -23,7 +23,7 @@ and bar are already existing atoms, but 'Buz' is not).
 ## Fixed
 
 - The client is now waiting 1 second before trying to reconnect when it gets
-disconnected fomr the server.
+disconnected from the server.
 
 ## [1.1.0] - 2024-10-12
 
