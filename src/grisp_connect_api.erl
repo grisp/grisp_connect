@@ -16,13 +16,9 @@
 -spec handle_msg(Msg) ->
     ok | {reply, Result :: term(), ReqRef :: binary() | integer()}
   when Msg :: {request, Method :: jarl:method(), Params :: map() | list(), ReqRef :: binary() | integer()}
-            | {notification, jarl:method(), Params :: map() | list()}
-            | {remote_error, Code :: integer() | atom(), Message :: undefined | binary(), Data :: term()}.
+            | {notification, jarl:method(), Params :: map() | list()}.
 handle_msg({notification, M, Params}) ->
     ?LOG_ERROR("Received unexpected notification ~p: ~p", [M, Params]),
-    ok;
-handle_msg({remote_error, Code, Message, _Data}) ->
-    ?LOG_ERROR("Received JSON-RPC error ~p: ~s", [Code, Message]),
     ok;
 handle_msg({request, M, Params, ID})
   when M == [?method_post]; M == [?method_get] ->

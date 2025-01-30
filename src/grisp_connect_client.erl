@@ -177,7 +177,7 @@ connecting(state_timeout, timeout, Data = #data{retry_count = RetryCount}) ->
                    event => connection_failed, reason => Reason}),
     Data2 = conn_close(Data, Reason),
     {next_state, waiting_ip, Data2#data{retry_count = RetryCount + 1}};
-connecting(info, {conn, Conn, connected}, Data = #data{conn = Conn}) ->
+connecting(info, {jarl, Conn, connected}, Data = #data{conn = Conn}) ->
     % Received from the connection process
     ?LOG_INFO(#{description => <<"Connected to grisp.io">>,
                 event => connected}),
@@ -189,10 +189,10 @@ connected(enter, _OldState, _Data) ->
     keep_state_and_data;
 connected({call, From}, is_connected, _) ->
     {keep_state_and_data, [{reply, From, true}]};
-connected(info, {conn, Conn, Msg}, Data = #data{conn = Conn}) ->
+connected(info, {jarl, Conn, Msg}, Data = #data{conn = Conn}) ->
     handle_connection_message(Data, Msg);
 connected({call, From}, {request, Method, Type, Params}, Data) ->
-    Data2 = conn_post(Data, Method, Type, Params,
+    Data2 = conn_request(Data, Method, Type, Params,
                 fun(D, R) -> gen_statem:reply(From, {ok, R}), D end,
                 fun(D, _, C, _, _) -> gen_statem:reply(From, {error, C}), D end),
     {keep_state, Data2};
@@ -222,7 +222,7 @@ handle_common(info, {'EXIT', Conn, Reason}, _State,
                     ?FORMAT("The connection to grisp.io died: ~p", [Reason]),
                    event => connection_failed, reason => Reason}),
     {next_state, waiting_ip, conn_died(Data#data{retry_count = RetryCount + 1})};
-handle_common(info, {conn, Conn, Msg}, State, _Data) ->
+handle_common(info, {jarl, Conn, Msg}, State, _Data) ->
     ?LOG_DEBUG("Received message from unknown connection ~p in state ~w: ~p",
                [Conn, State, Msg]),
     keep_state_and_data;
@@ -258,19 +258,19 @@ handle_connection_message(_Data, {response, _Result, #{on_result := undefined}})
     keep_state_and_data;
 handle_connection_message(Data, {response, Result, #{on_result := OnResult}}) ->
     {keep_state, OnResult(Data, Result)};
-handle_connection_message(_Data, {remote_error, Code, Msg, _ErrorData,
+handle_connection_message(_Data, {error, Code, Msg, _ErrorData,
                                  #{on_error := undefined}}) ->
     ?LOG_WARNING("Unhandled remote request error ~w: ~s", [Code, Msg]),
     keep_state_and_data;
-handle_connection_message(Data, {remote_error, Code, Msg, ErrorData,
+handle_connection_message(Data, {error, Code, Msg, ErrorData,
                                  #{on_error := OnError}}) ->
     {keep_state, OnError(Data, remote, Code, Msg, ErrorData)};
 
-handle_connection_message(_Data, {local_error, Reason,
+handle_connection_message(_Data, {jarl_error, Reason,
                                  #{on_error := undefined}}) ->
     ?LOG_WARNING("Unhandled local request error ~w", [Reason]),
     keep_state_and_data;
-handle_connection_message(Data, {local_error, Reason,
+handle_connection_message(Data, {jarl_error, Reason,
                                  #{on_error := OnError}}) ->
     {keep_state, OnError(Data, local, Reason, undefined, undefined)};
 handle_connection_message(Data, Msg) ->
@@ -322,16 +322,16 @@ conn_died(Data) ->
     grisp_connect_log_server:stop(),
     Data#data{conn = undefined}.
 
--spec conn_post(data(), jarl:method(), atom(), map(),
+-spec conn_request(data(), jarl:method(), atom(), map(),
                 undefined | on_result_fun(), undefined | on_error_fun())
     -> data().
-conn_post(Data = #data{conn = Conn}, Method, Type, Params, OnResult, OnError)
+conn_request(Data = #data{conn = Conn}, Method, Type, Params, OnResult, OnError)
   when Conn =/= undefined ->
     ReqCtx = #{on_result => OnResult, on_error => OnError},
     Params2 = maps:put(type, Type, Params),
-    case jarl:post(Conn, Method, Params2, ReqCtx) of
+    case jarl:request(Conn, Method, Params2, ReqCtx) of
         ok -> Data;
-        {error, Reason} ->
+        {jarl_error, Reason} ->
             OnError(Data, local, Reason, undefined, undefined)
     end.
 
