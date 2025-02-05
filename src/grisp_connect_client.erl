@@ -52,7 +52,7 @@
 
 -define(FORMAT(FMT, ARGS), iolist_to_binary(io_lib:format(FMT, ARGS))).
 -define(STD_TIMEOUT, 1000).
--define(CONNECT_TIMEOUT, 2000).
+-define(CONNECT_TIMEOUT, 5000).
 -define(ENV(KEY, GUARDS), fun() ->
     case application:get_env(grisp_connect, KEY) of
         {ok, V} when GUARDS -> V;
@@ -179,8 +179,8 @@ connecting(state_timeout, timeout, Data = #data{retry_count = RetryCount}) ->
     {next_state, waiting_ip, Data2#data{retry_count = RetryCount + 1}};
 connecting(info, {jarl, Conn, connected}, Data = #data{conn = Conn}) ->
     % Received from the connection process
-    ?LOG_INFO(#{description => <<"Connected to grisp.io">>,
-                event => connected}),
+    ?LOG_NOTICE(#{description => <<"Connected to grisp.io">>,
+                  event => connected}),
     {next_state, connected, Data#data{retry_count = 0}};
 ?HANDLE_COMMON.
 
@@ -222,6 +222,9 @@ handle_common(info, {'EXIT', Conn, Reason}, _State,
                     ?FORMAT("The connection to grisp.io died: ~p", [Reason]),
                    event => connection_failed, reason => Reason}),
     {next_state, waiting_ip, conn_died(Data#data{retry_count = RetryCount + 1})};
+handle_common(info, {'EXIT', _Conn, _Reason}, _State, _Data) ->
+    % Ignore any EXIT from past jarl connections
+    keep_state_and_data;
 handle_common(info, {jarl, Conn, Msg}, State, _Data) ->
     ?LOG_DEBUG("Received message from unknown connection ~p in state ~w: ~p",
                [Conn, State, Msg]),
