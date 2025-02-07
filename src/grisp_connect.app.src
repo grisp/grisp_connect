@@ -30,12 +30,12 @@
         {logger, [
             % Enable our own default handler,
             % which will receive all events from boot
-            {handler,
-                grisp_connect_log_handler,
-                grisp_connect_logger_bin,
-                #{formatter => {grisp_connect_logger_bin, #{}},
+            {handler, grisp_connect_log_handler, grisp_connect_logger_bin, #{
+                formatter => {grisp_connect_logger_bin, #{}},
                 filter_default => log,
                 filters => [
+                    % Filter out supervisor progress reports so
+                    % TLS certificates are not swamping the console...
                     {disable_progress, {fun logger_filters:progress/2, stop}}
                 ]
             }}

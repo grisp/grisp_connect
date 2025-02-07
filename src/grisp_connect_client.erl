@@ -249,6 +249,7 @@ generic_errors() -> [
     {device_already_linked,      -3, <<"Device already linked">>},
     {invalid_token,              -4, <<"Invalid token">>},
     {grisp_updater_unavailable, -10, <<"Software update unavailable">>},
+    {already_updating,          -11, <<"Already updating">>},
     {boot_system_not_validated, -12, <<"Boot system not validated">>},
     {validate_from_unbooted,    -13, <<"Validate from unbooted">>}
 ].
@@ -279,8 +280,11 @@ handle_connection_message(Data, {jarl_error, Reason,
 handle_connection_message(Data, Msg) ->
     case grisp_connect_api:handle_msg(Msg) of
         ok -> keep_state_and_data;
+        {error, Code, Message, ErData, ReqRef} ->
+            conn_error(Data, Code, Message, ErData, ReqRef),
+            keep_state_and_data;
         {reply, Result, ReqRef} ->
-            conn_reply(Data, Result, ReqRef),
+            conn_result(Data, Result, ReqRef),
             keep_state_and_data
     end.
 
@@ -343,9 +347,13 @@ conn_notify(#data{conn = Conn}, Method, Type, Params)
     Params2 = maps:put(type, Type, Params),
     jarl:notify(Conn, Method, Params2).
 
-conn_reply(#data{conn = Conn}, Result, ReqRef)
+conn_result(#data{conn = Conn}, Result, ReqRef)
   when Conn =/= undefined ->
     jarl:reply(Conn, Result, ReqRef).
+
+conn_error(#data{conn = Conn}, Code, Message, ErData, ReqRef)
+  when Conn =/= undefined ->
+    jarl:reply(Conn, Code, Message, ErData, ReqRef).
 
 % IP check functions
 

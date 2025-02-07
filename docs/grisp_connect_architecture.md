@@ -59,11 +59,10 @@ It provides a high-level API to a JSON-RPC connection:
  - Perform synchronous requests
  - Start asynchronous requests
  - Reply to a request
- - Send and error result for a request
+ - Send an error result for a request
  - Send asynchronous notifications
- - Send generic errors
 
 When performing an asynchronous request, the caller can give an opaque context
-term, that will given back when receiving a response or an error for this
+term, that will be given back when receiving a response or an error for this
 request, allowing the caller to handle the asynchronous operation without having
 to store information locally.

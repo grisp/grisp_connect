@@ -13,7 +13,7 @@ and this project adheres to
 - The name of the grisp_connect configuration key to control the timeout of
 individual JSON-RPC requests changed from ws_requests_timeout to
 ws_request_timeout.
-- Le default log filter changed to trying to filter out only some messages to
+- The default log filter changed to trying to filter out only some messages to
 filtering out all progress messages, as it wasn't working reliably.
 - JSON-RPC logic was extracted into the jarl library.
 - Jarl parses the methods into a list of atom or binaries to pave the
