@@ -351,8 +351,11 @@ conn_result(#data{conn = Conn}, Result, ReqRef)
     jarl:reply(Conn, Result, ReqRef).
 
 conn_error(#data{conn = Conn}, Code, Message, ErData, ReqRef)
-  when Conn =/= undefined ->
-    jarl:reply(Conn, Code, Message, ErData, ReqRef).
+  when Conn =/= undefined, is_binary(ErData) orelse ErData =:= undefined ->
+    jarl:reply(Conn, Code, Message, ErData, ReqRef);
+conn_error(Data, Code, Message, ErData, ReqRef) ->
+    BinErData = iolist_to_binary(io_lib:format("~p", [ErData])),
+    conn_error(Data, Code, Message, BinErData, ReqRef).
 
 % IP check functions
 

@@ -45,7 +45,7 @@ system_info() ->
     maps:merge(RelInfo, UpdateInfo).
 
 start_update(URL) ->
-    case is_running(grisp_updater) of
+    case grisp_connect_updater:is_available() of
         true -> grisp_updater:start(URL,
                                     grisp_connect_updater_progress,
                                     #{client => self()}, #{});
@@ -53,13 +53,13 @@ start_update(URL) ->
     end.
 
 validate() ->
-    case is_running(grisp_updater) of
+    case grisp_connect_updater:is_available() of
         true -> grisp_updater:validate();
         false -> {error, grisp_updater_unavailable}
     end.
 
 cancel() ->
-    case is_running(grisp_updater) of
+    case grisp_connect_updater:is_available() of
         true -> grisp_updater:cancel();
         false -> {error, grisp_updater_unavailable}
     end.
@@ -75,7 +75,7 @@ is_running(AppName) ->
     end.
 
 update_info() ->
-    case is_running(grisp_updater) of
+    case grisp_connect_updater:is_available() of
         false ->
             #{update_enabled => false};
         true ->

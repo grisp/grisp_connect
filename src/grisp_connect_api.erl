@@ -12,7 +12,7 @@
 
 %--- API -----------------------------------------------------------------------
 
-% @doc Handles requests, notifications and errors from grisp.io.
+% @doc Handles requests and notifications from grisp.io.
 -spec handle_msg(Msg) ->
     ok | {reply, Result :: term(), ReqRef :: binary() | integer()}
   when Msg :: {request, Method :: jarl:method(), Params :: map() | list(), ReqRef :: binary() | integer()}
@@ -47,8 +47,8 @@ handle_request([?method_post], #{type := <<"start_update">>} = Params, ID) ->
                 {reply, ok, ID}
         end
     catch
-        throw:bad_key ->
-            {error, internal_error, <<"Invalid params">>, ID}
+        error:{badkey, _} ->
+            {error, internal_error, <<"Invalid params">>, undefined, ID}
     end;
 handle_request([?method_post], #{type := <<"validate">>}, ID) ->
     case grisp_connect_updater:validate() of

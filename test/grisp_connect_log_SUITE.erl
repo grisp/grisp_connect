@@ -191,7 +191,7 @@ last_seq() ->
     reset_log(Seq).
 
 
-reset_log(LasSeq) ->
+reset_log(LastSeq) ->
     send_logs(),
     try receive_jsonrpc_request(200) of
         #{id := Id, params := #{type := <<"logs">>, events := Events}} ->
@@ -200,9 +200,9 @@ reset_log(LasSeq) ->
             send_jsonrpc_result(#{seq => MaxSeq, dropped => 0}, Id),
             reset_log(MaxSeq);
         _Other ->
-            reset_log(LasSeq)
+            reset_log(LastSeq)
     catch
-        error:timeout -> LasSeq
+        error:timeout -> LastSeq
     end.
 
 check_log(Seq, Level, Text) ->
