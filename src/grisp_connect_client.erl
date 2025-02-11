@@ -152,8 +152,7 @@ waiting_ip(state_timeout, retry, Data = #data{retry_count = RetryCount}) ->
             {next_state, connecting, Data};
         invalid ->
             ?LOG_DEBUG(#{event => waiting_ip}),
-            {next_state, waiting_ip, Data#data{retry_count = RetryCount + 1},
-             [{state_timeout, ?STD_TIMEOUT, retry}]}
+            {repeat_state, Data#data{retry_count = RetryCount + 1}}
     end;
 ?HANDLE_COMMON.
 
