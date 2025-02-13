@@ -1,9 +1,13 @@
 {"1.2.0",
 [{<<"certifi">>,{pkg,<<"certifi">>,<<"2.13.0">>},0},
- {<<"cowlib">>,{pkg,<<"cowlib">>,<<"2.13.0">>},1},
+ {<<"cowlib">>,{pkg,<<"cowlib">>,<<"2.13.0">>},2},
  {<<"grisp">>,{pkg,<<"grisp">>,<<"2.7.0">>},0},
  {<<"grisp_cryptoauth">>,{pkg,<<"grisp_cryptoauth">>,<<"2.4.0">>},0},
- {<<"gun">>,{pkg,<<"gun">>,<<"2.1.0">>},0},
+ {<<"gun">>,{pkg,<<"gun">>,<<"2.1.0">>},1},
+ {<<"jarl">>,
+  {git,"https://github.com/grisp/jarl.git",
+       {ref,"10085d38df19c67664d33ef61f515c92a8b0de56"}},
+  0},
  {<<"jsx">>,{pkg,<<"jsx">>,<<"3.1.0">>},0},
  {<<"mapz">>,{pkg,<<"mapz">>,<<"2.4.0">>},1}]}.
 [

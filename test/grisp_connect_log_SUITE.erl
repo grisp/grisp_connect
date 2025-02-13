@@ -13,6 +13,7 @@
 
 -import(grisp_connect_test_server, [flush/0]).
 -import(grisp_connect_test_server, [receive_jsonrpc_request/0]).
+-import(grisp_connect_test_server, [receive_jsonrpc_request/1]).
 -import(grisp_connect_test_server, [send_jsonrpc_result/2]).
 
 %--- API -----------------------------------------------------------------------
@@ -31,7 +32,7 @@ init_per_suite(Config) ->
     [{apps, Apps} | Config].
 
 end_per_suite(Config) ->
-    [?assertEqual(ok, application:stop(App)) || App <- ?config(apps, Config)].
+    grisp_connect_test_server:stop(?config(apps, Config)).
 
 init_per_testcase(log_level_test, Config) ->
     #{level := Level} = logger:get_primary_config(),
@@ -49,17 +50,18 @@ end_per_testcase(log_level_test, Config) ->
     end_per_testcase(other, Config);
 end_per_testcase(_, Config) ->
     ok = application:stop(grisp_connect),
+    grisp_connect_test_server:wait_disconnection(),
     ?assertEqual([], flush()),
     Config.
 
 %--- Tests ---------------------------------------------------------------------
 
 string_logs_test(_) ->
-    LastSeq = last_seq(),
     S1 = "@#$%^&*()_ +{}|:\"<>?-[];'./,\\`~!\néäüßóçøáîùêñÄÖÜÉÁÍÓÚàèìòùÂÊÎÔÛ€",
     S2 = <<"@#$%^&*()_ +{}|:\"<>?-[];'./,\\`~!\néäüßóçøáîùêñÄÖÜÉÁÍÓÚàèìòùÂÊÎÔÛ€"/utf8>>,
     Strings = [S1, S2],
     Texts = [<<S2/binary>>, <<S2/binary>>],
+    LastSeq = last_seq(),
     Seqs = [LastSeq + 1, LastSeq + 2],
     Fun = fun({Seq, String, Text}) ->
                   grisp_connect:log(error, [String]),
@@ -73,12 +75,12 @@ formatted_logs_test(_) ->
                 ["~p, ~tp", [<<"tést">>, <<"tést"/utf8>>]],
                 ["~s, ~ts", ["tést", "tést"]],
                 ["~s, ~ts", [<<"tést">>, <<"tést"/utf8>>]]],
-    LastSeq = last_seq(),
     Texts = [<<"ä, €"/utf8>>,
              <<"tést, tést"/utf8>>,
              <<"<<\"tést\">>, <<\"tést\"/utf8>>"/utf8>>,
              <<"tést, tést"/utf8>>,
              <<"tést, tést"/utf8>>],
+    LastSeq = last_seq(),
     Seqs = lists:seq(LastSeq + 1, LastSeq + length(ArgsList)),
     Fun = fun({Seq, Args, Text}) ->
                   grisp_connect:log(error, Args),
@@ -96,7 +98,6 @@ structured_logs_test(_) ->
               #{event => 1234},
               #{event => 0.1},
               #{event => {'äh', 'bäh'}}],
-    LastSeq = last_seq(),
     Texts = [#{event => <<"tést"/utf8>>},
              #{event => "tést"},
              #{event => <<"tést"/utf8>>},
@@ -106,6 +107,7 @@ structured_logs_test(_) ->
              #{event => 1234},
              #{event => 0.1},
              <<"[JSON incompatible term]\n#{event => {äh,bäh}}"/utf8>>],
+    LastSeq = last_seq(),
     Seqs = lists:seq(LastSeq + 1, LastSeq + length(Events)),
     Fun = fun({Seq, Event, Text}) ->
                   grisp_connect:log(error, [Event]),
@@ -185,7 +187,23 @@ last_seq() ->
     Events = maps:get(events, maps:get(params, Send)),
     [Seq, _] = lists:last(Events),
     send_jsonrpc_result(#{seq => Seq, dropped => 0}, Id),
-    Seq.
+    % Consume all the log events, updating the sequence number
+    reset_log(Seq).
+
+
+reset_log(LastSeq) ->
+    send_logs(),
+    try receive_jsonrpc_request(200) of
+        #{id := Id, params := #{type := <<"logs">>, events := Events}} ->
+            AllSeq = [S || [S, _] <- Events],
+            MaxSeq = lists:max(AllSeq),
+            send_jsonrpc_result(#{seq => MaxSeq, dropped => 0}, Id),
+            reset_log(MaxSeq);
+        _Other ->
+            reset_log(LastSeq)
+    catch
+        error:timeout -> LastSeq
+    end.
 
 check_log(Seq, Level, Text) ->
     send_logs(),

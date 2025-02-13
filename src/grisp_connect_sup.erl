@@ -44,7 +44,6 @@ init([]) ->
 %% Hence grisp_connect_log_server should be started before grisp_connect_client
 %% and a crash in grisp_connect_log_server should crash grisp_connect_client as well.
     ChildSpecs = NTP ++ [
-        worker(grisp_connect_ws, []),
         worker(grisp_connect_log_server, []),
         worker(grisp_connect_client, [])
     ],
