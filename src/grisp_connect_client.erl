@@ -13,6 +13,7 @@
 -export([start_link/0]).
 -export([connect/0]).
 -export([is_connected/0]).
+-export([wait_connected/1]).
 -export([request/3]).
 -export([notify/3]).
 
@@ -37,7 +38,10 @@
     ws_path :: binary(),
     ws_transport :: tcp | tls,
     conn :: undefined | pid(),
-    retry_count = 0 :: non_neg_integer()
+    retry_count = 0 :: non_neg_integer(),
+    last_error :: term(),
+    max_retries = infinity :: non_neg_integer() | infinity,
+    wait_calls = [] :: [gen_statem:from()]
 }).
 
 -type data() :: #data{}.
@@ -50,6 +54,8 @@
 
 %--- Macros --------------------------------------------------------------------
 
+-define(GRISP_IO_VERSION_HEADER, <<"x-grisp-io-version">>).
+-define(GRISP_IO_VERSION, <<"1.0">>).
 -define(FORMAT(FMT, ARGS), iolist_to_binary(io_lib:format(FMT, ARGS))).
 -define(STD_TIMEOUT, 1000).
 -define(CONNECT_TIMEOUT, 5000).
@@ -85,6 +91,11 @@ is_connected() ->
     catch exit:noproc -> false
     end.
 
+wait_connected(Timeout) ->
+    try gen_statem:call(?MODULE, ?FUNCTION_NAME, Timeout)
+    catch exit:noproc -> {error, noproc}
+    end.
+
 request(Method, Type, Params) ->
     gen_statem:call(?MODULE, {?FUNCTION_NAME, Method, Type, Params}).
 
@@ -107,11 +118,13 @@ init([]) ->
     Port = ?ENV(port, is_integer(V) andalso V >= 0 andalso V < 65536),
     WsTransport = ?ENV(ws_transport, V =:= tls orelse V =:= tcp),
     WsPath = ?ENV(ws_path, is_binary(V) orelse is_list(V), as_bin(V)),
+    MaxRetries = ?ENV(ws_max_retries, is_integer(V) orelse V =:= infinity),
     Data = #data{
         domain = Domain,
         port = Port,
         ws_transport = WsTransport,
-        ws_path = WsPath
+        ws_path = WsPath,
+        max_retries = MaxRetries
     },
     % The error list is put in a persistent term to not add noise to the state.
     persistent_term:put({?MODULE, self()}, generic_errors()),
@@ -133,8 +146,13 @@ callback_mode() -> [state_functions, state_enter].
 
 %--- Behaviour gen_statem State Callback Functions -----------------------------
 
-idle(enter, _OldState, _Data) ->
-    keep_state_and_data;
+idle(enter, _OldState,
+     Data = #data{wait_calls = WaitCalls, last_error = LastError}) ->
+    % When entering idle, we reply to all wait_connected calls with the last error
+    gen_statem:reply([{reply, F, {error, LastError}} || F <- WaitCalls]),
+    {keep_state, Data#data{wait_calls = [], last_error = undefined}};
+idle({call, From}, wait_connected, _) ->
+    {keep_state_and_data, [{reply, From, {error, not_connecting}}]};
 idle(cast, connect, Data) ->
     {next_state, waiting_ip, Data};
 ?HANDLE_COMMON.
@@ -152,14 +170,14 @@ waiting_ip(state_timeout, retry, Data = #data{retry_count = RetryCount}) ->
             {next_state, connecting, Data};
         invalid ->
             ?LOG_DEBUG(#{event => waiting_ip}),
-            {repeat_state, Data#data{retry_count = RetryCount + 1}}
+            {repeat_state, Data#data{retry_count = RetryCount + 1,
+                                     last_error = no_ip_available}}
     end;
 ?HANDLE_COMMON.
 
 connecting(enter, _OldState, Data) ->
     {keep_state, Data, [{state_timeout, 0, connect}]};
-connecting(state_timeout, connect,
-           Data = #data{conn = undefined, retry_count = RetryCount}) ->
+connecting(state_timeout, connect, Data = #data{conn = undefined}) ->
     ?LOG_INFO(#{description => <<"Connecting to grisp.io">>,
                 event => connecting}),
     case conn_start(Data) of
@@ -168,24 +186,32 @@ connecting(state_timeout, connect,
         {error, Reason} ->
             ?LOG_WARNING("Failed to connect to grisp.io: ~p", [Reason],
                          #{event => connection_failed, reason => Reason}),
-            {next_state, waiting_ip, Data#data{retry_count = RetryCount + 1}}
+            reconnect(Data, Reason)
     end;
-connecting(state_timeout, timeout, Data = #data{retry_count = RetryCount}) ->
+connecting(state_timeout, timeout, Data) ->
     Reason = connect_timeout,
     ?LOG_WARNING(#{description => <<"Timeout while connecting to grisp.io">>,
                    event => connection_failed, reason => Reason}),
-    Data2 = conn_close(Data, Reason),
-    {next_state, waiting_ip, Data2#data{retry_count = RetryCount + 1}};
-connecting(info, {jarl, Conn, connected}, Data = #data{conn = Conn}) ->
+    reconnect(conn_close(Data, Reason), Reason);
+connecting(info, {jarl, Conn, {connected, Headers}}, Data = #data{conn = Conn}) ->
     % Received from the connection process
-    ?LOG_NOTICE(#{description => <<"Connected to grisp.io">>,
-                  event => connected}),
-    {next_state, connected, Data#data{retry_count = 0}};
+    case conn_validate(Data, Headers) of
+        {ok, Data2} ->
+            ?LOG_NOTICE(#{description => <<"Connected to grisp.io">>,
+                        event => connected}),
+            {next_state, connected, Data2#data{retry_count = 0}};
+        {error, Reason} ->
+            ?LOG_ERROR(#{description => <<"Connected to grisp.io handshake failed">>,
+                        event => handshake_failed, reason => Reason}),
+            reconnect(conn_close(Data, Reason), Reason)
+    end;
 ?HANDLE_COMMON.
 
-connected(enter, _OldState, _Data) ->
+connected(enter, _OldState, Data = #data{wait_calls = WaitCalls}) ->
+    % When entering connected, we reply to all wait_connected calls with ok
+    gen_statem:reply([{reply, F, ok} || F <- WaitCalls]),
     grisp_connect_log_server:start(),
-    keep_state_and_data;
+    {keep_state, Data#data{wait_calls = [], last_error = undefined}};
 connected({call, From}, is_connected, _) ->
     {keep_state_and_data, [{reply, From, true}]};
 connected(info, {jarl, Conn, Msg}, Data = #data{conn = Conn}) ->
@@ -205,6 +231,9 @@ handle_common(cast, connect, State, _Data) when State =/= idle ->
     keep_state_and_data;
 handle_common({call, From}, is_connected, State, _) when State =/= connected ->
     {keep_state_and_data, [{reply, From, false}]};
+handle_common({call, From}, wait_connected, _State,
+              Data = #data{wait_calls = WaitCalls}) ->
+    {keep_state, Data#data{wait_calls = [From | WaitCalls]}};
 handle_common({call, From}, {request, _, _, _}, State, _Data)
 when State =/= connected ->
     {keep_state_and_data, [{reply, From, {error, disconnected}}]};
@@ -214,13 +243,12 @@ handle_common(cast, {notify, _Method, _Type, _Params}, _State, _Data) ->
 handle_common(info, reboot, _, _) ->
     init:stop(),
     keep_state_and_data;
-handle_common(info, {'EXIT', Conn, Reason}, _State,
-              Data = #data{conn = Conn, retry_count = RetryCount}) ->
+handle_common(info, {'EXIT', Conn, Reason}, _State, Data = #data{conn = Conn}) ->
     % The connection process died
     ?LOG_WARNING(#{description =>
                     ?FORMAT("The connection to grisp.io died: ~p", [Reason]),
                    event => connection_failed, reason => Reason}),
-    {next_state, waiting_ip, conn_died(Data#data{retry_count = RetryCount + 1})};
+    reconnect(conn_died(Data), Reason);
 handle_common(info, {'EXIT', _Conn, _Reason}, _State, _Data) ->
     % Ignore any EXIT from past jarl connections
     keep_state_and_data;
@@ -287,6 +315,20 @@ handle_connection_message(Data, Msg) ->
             keep_state_and_data
     end.
 
+reconnect(Data = #data{retry_count = RetryCount,
+                       max_retries = MaxRetries,
+                       last_error = LastError}, Reason)
+  when MaxRetries =/= infinity, RetryCount > MaxRetries ->
+    Error = case Reason of undefined -> LastError; E -> E end,
+    ?LOG_ERROR(#{description => <<"Max retries reached, giving up connecting to grisp.io">>,
+                 event => max_retries_reached, last_error => LastError}),
+    {next_state, idle, Data#data{retry_count = 0, last_error = Error}};
+reconnect(Data = #data{retry_count = RetryCount,
+                       last_error = LastError}, Reason) ->
+    Error = case Reason of undefined -> LastError; E -> E end,
+    {next_state, waiting_ip,
+     Data#data{retry_count = RetryCount + 1, last_error = Error}}.
+
 % Connection Functions
 
 conn_start(Data = #data{conn = undefined,
@@ -308,11 +350,22 @@ conn_start(Data = #data{conn = undefined,
         path => WsPath,
         errors => ErrorList,
         ping_timeout => WsPingTimeout,
-        request_timeout => WsReqTimeout
+        request_timeout => WsReqTimeout,
+        headers => [{?GRISP_IO_VERSION_HEADER, ?GRISP_IO_VERSION}]
     },
     case jarl:start_link(self(), ConnOpts) of
         {error, _Reason} = Error -> Error;
         {ok, Conn} -> {ok, Data#data{conn = Conn}}
+    end.
+
+conn_validate(Data, Headers) ->
+    case lists:keyfind(?GRISP_IO_VERSION_HEADER, 1, Headers) of
+        false ->
+            {error, no_grisp_io_version};
+        {?GRISP_IO_VERSION_HEADER, ?GRISP_IO_VERSION} ->
+            {ok, Data};
+        {?GRISP_IO_VERSION_HEADER, Ver} ->
+            {error, {unsupported_grisp_io_version, Ver}}
     end.
 
 % Safe to call in any state

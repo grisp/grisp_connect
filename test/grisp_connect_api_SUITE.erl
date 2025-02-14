@@ -32,15 +32,13 @@ all() ->
         lists:suffix("_test", atom_to_list(F))
     ].
 
-init_per_suite(Config) ->
-    CertDir = cert_dir(),
-    Apps = grisp_connect_test_server:start(CertDir),
-    [{apps, Apps} | Config].
-
-end_per_suite(Config) ->
-    grisp_connect_test_server:stop(?config(apps, Config)).
-
+init_per_testcase(TestCase, Config)
+  when TestCase =:= bad_client_version_test;
+       TestCase =:= bad_server_version_test  ->
+    Config;
 init_per_testcase(TestCase, Config) ->
+    CertDir = cert_dir(),
+    Apps = grisp_connect_test_server:start(#{cert_dir => CertDir}),
     {ok, _} = application:ensure_all_started(grisp_emulation),
     {ok, _} = application:ensure_all_started(grisp_connect),
     case TestCase of
@@ -49,15 +47,64 @@ init_per_testcase(TestCase, Config) ->
             ?assertEqual(ok, wait_connection()),
             grisp_connect_test_server:listen()
     end,
-    Config.
+    [{apps, Apps} | Config].
 
+end_per_testcase(TestCase, Config)
+    when TestCase =:= bad_client_version_test;
+         TestCase =:= bad_server_version_test  ->
+      Config;
 end_per_testcase(_, Config) ->
     ok = application:stop(grisp_connect),
     grisp_connect_test_server:wait_disconnection(),
     ?assertEqual([], flush()),
+    grisp_connect_test_server:stop(proplists:get_value(apps, Config)),
     Config.
 
 %--- Tests ---------------------------------------------------------------------
+
+bad_client_version_test(_) ->
+    CertDir = cert_dir(),
+    Apps = grisp_connect_test_server:start(#{
+        cert_dir => CertDir,
+        expected_grisp_io_version => <<"42.0">>}),
+    try
+        {ok, _} = application:ensure_all_started(grisp_emulation),
+        application:load(grisp_connect),
+        application:set_env(grisp_connect, ws_max_retries, 2),
+        {ok, _} = application:ensure_all_started(grisp_connect),
+        try
+            ?assertMatch({error, ws_upgrade_failed}, wait_connection())
+        after
+            ok = application:stop(grisp_connect)
+        end
+    after
+        grisp_connect_test_server:wait_disconnection(),
+        ?assertEqual([], flush()),
+        grisp_connect_test_server:stop(Apps)
+    end,
+    ok.
+
+bad_server_version_test(_) ->
+    CertDir = cert_dir(),
+    Apps = grisp_connect_test_server:start(#{
+        cert_dir => CertDir,
+        selected_grisp_io_version => <<"42.0">>}),
+    try
+        {ok, _} = application:ensure_all_started(grisp_emulation),
+        application:load(grisp_connect),
+        application:set_env(grisp_connect, ws_max_retries, 2),
+        {ok, _} = application:ensure_all_started(grisp_connect),
+        try
+            ?assertMatch({error, {unsupported_grisp_io_version, _}}, wait_connection())
+        after
+            ok = application:stop(grisp_connect)
+        end
+    after
+        grisp_connect_test_server:wait_disconnection(),
+        ?assertEqual([], flush()),
+        grisp_connect_test_server:stop(Apps)
+    end,
+    ok.
 
 auto_connect_test(_) ->
     ?assertMatch(ok, wait_connection()).

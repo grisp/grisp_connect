@@ -38,13 +38,12 @@
 % Returns the started apps
 start() ->
     {ok, Apps} = application:ensure_all_started(cowboy),
-    start_cowboy(),
+    start_cowboy(#{}),
     Apps.
 
-start(CertDir) ->
+start(Opts) ->
     {ok, Apps} = application:ensure_all_started(cowboy),
-    % TODO: Disable ssl for testing
-    start_cowboy(CertDir),
+    start_cowboy(Opts),
     Apps.
 
 stop(Apps) ->
@@ -57,12 +56,9 @@ stop(Apps) ->
 % Start the cowboy listener.
 % You have to make sure cowboy is running before.
 start_cowboy() ->
-    Dispatch = cowboy_router:compile(
-        [{'_', [{"/grisp-connect/ws", grisp_connect_test_server, []}]}]),
-    {ok, _} = cowboy:start_clear(server_listener, [{port, 3030}],
-                                 #{env => #{dispatch => Dispatch}}).
+    start_cowboy(#{}).
 
-start_cowboy(CertDir) ->
+start_cowboy(#{cert_dir := CertDir} = Opts) ->
     SslOpts = [
         {verify, verify_peer},
         {keyfile, filename:join(CertDir, "server.key")},
@@ -71,11 +67,16 @@ start_cowboy(CertDir) ->
     ],
     Dispatch = cowboy_router:compile(
                  [{'_',
-                   [{"/grisp-connect/ws", grisp_connect_test_server, []}]}]),
+                   [{"/grisp-connect/ws", grisp_connect_test_server, Opts}]}]),
     {ok, _} = cowboy:start_tls(server_listener,
         [{port, 3030} | SslOpts],
         #{env => #{dispatch => Dispatch}}
-    ).
+    );
+start_cowboy(Opts) ->
+    Dispatch = cowboy_router:compile(
+        [{'_', [{"/grisp-connect/ws", grisp_connect_test_server, Opts}]}]),
+    {ok, _} = cowboy:start_clear(server_listener, [{port, 3030}],
+                                 #{env => #{dispatch => Dispatch}}).
 
 % Stop the cowboy listener.
 stop_cowboy() ->
@@ -198,8 +199,20 @@ wait_disconnection() ->
 
 %--- Websocket Callbacks -------------------------------------------------------
 
-init(Req, State) ->
-    {cowboy_websocket, Req, State}.
+init(Req, Opts) ->
+    ExpVer = maps:get(expected_grisp_io_version, Opts, <<"1.0">>),
+    SelVer = maps:get(selected_grisp_io_version, Opts, <<"1.0">>),
+    case cowboy_req:header(<<"x-grisp-io-version">>, Req) of
+        undefined ->
+            Req2 = cowboy_req:reply(400, #{}, <<"No Grisp.io version specified">>, Req),
+            {ok, Req2, Opts};
+        ExpVer ->
+            Req2 = cowboy_req:set_resp_header(<<"x-grisp-io-version">>, SelVer, Req),
+            {cowboy_websocket, Req2, Opts};
+        _ ->
+            Req2 = cowboy_req:reply(400, #{}, <<"Unsupported Grisp.io Version">>, Req),
+            {ok, Req2, Opts}
+    end.
 
 websocket_init(_) ->
     register(?MODULE, self()),
