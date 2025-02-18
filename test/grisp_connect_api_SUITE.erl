@@ -66,7 +66,7 @@ bad_client_version_test(_) ->
     CertDir = cert_dir(),
     Apps = grisp_connect_test_server:start(#{
         cert_dir => CertDir,
-        expected_grisp_io_version => <<"42.0">>}),
+        expected_protocol => <<"grisp-io-v42">>}),
     try
         {ok, _} = application:ensure_all_started(grisp_emulation),
         application:load(grisp_connect),
@@ -88,14 +88,15 @@ bad_server_version_test(_) ->
     CertDir = cert_dir(),
     Apps = grisp_connect_test_server:start(#{
         cert_dir => CertDir,
-        selected_grisp_io_version => <<"42.0">>}),
+        selected_protocol => <<"grisp-io-v42">>}),
     try
         {ok, _} = application:ensure_all_started(grisp_emulation),
         application:load(grisp_connect),
         application:set_env(grisp_connect, ws_max_retries, 2),
         {ok, _} = application:ensure_all_started(grisp_connect),
         try
-            ?assertMatch({error, {unsupported_grisp_io_version, _}}, wait_connection())
+            % There is no way to know the reason why gun closed the connection
+            ?assertMatch({error, {closed, _}}, wait_connection())
         after
             ok = application:stop(grisp_connect)
         end

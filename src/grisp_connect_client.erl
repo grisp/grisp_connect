@@ -54,8 +54,7 @@
 
 %--- Macros --------------------------------------------------------------------
 
--define(GRISP_IO_VERSION_HEADER, <<"x-grisp-io-version">>).
--define(GRISP_IO_VERSION, <<"1.0">>).
+-define(GRISP_IO_PROTOCOL, <<"grisp-io-v1">>).
 -define(FORMAT(FMT, ARGS), iolist_to_binary(io_lib:format(FMT, ARGS))).
 -define(STD_TIMEOUT, 1000).
 -define(CONNECT_TIMEOUT, 5000).
@@ -193,18 +192,11 @@ connecting(state_timeout, timeout, Data) ->
     ?LOG_WARNING(#{description => <<"Timeout while connecting to grisp.io">>,
                    event => connection_failed, reason => Reason}),
     reconnect(conn_close(Data, Reason), Reason);
-connecting(info, {jarl, Conn, {connected, Headers}}, Data = #data{conn = Conn}) ->
+connecting(info, {jarl, Conn, {connected, _}}, Data = #data{conn = Conn}) ->
     % Received from the connection process
-    case conn_validate(Data, Headers) of
-        {ok, Data2} ->
-            ?LOG_NOTICE(#{description => <<"Connected to grisp.io">>,
-                        event => connected}),
-            {next_state, connected, Data2#data{retry_count = 0}};
-        {error, Reason} ->
-            ?LOG_ERROR(#{description => <<"Connected to grisp.io handshake failed">>,
-                        event => handshake_failed, reason => Reason}),
-            reconnect(conn_close(Data, Reason), Reason)
-    end;
+    ?LOG_NOTICE(#{description => <<"Connected to grisp.io">>,
+                  event => connected}),
+    {next_state, connected, Data#data{retry_count = 0}};
 ?HANDLE_COMMON.
 
 connected(enter, _OldState, Data = #data{wait_calls = WaitCalls}) ->
@@ -351,21 +343,11 @@ conn_start(Data = #data{conn = undefined,
         errors => ErrorList,
         ping_timeout => WsPingTimeout,
         request_timeout => WsReqTimeout,
-        headers => [{?GRISP_IO_VERSION_HEADER, ?GRISP_IO_VERSION}]
+        protocols => [?GRISP_IO_PROTOCOL]
     },
     case jarl:start_link(self(), ConnOpts) of
         {error, _Reason} = Error -> Error;
         {ok, Conn} -> {ok, Data#data{conn = Conn}}
-    end.
-
-conn_validate(Data, Headers) ->
-    case lists:keyfind(?GRISP_IO_VERSION_HEADER, 1, Headers) of
-        false ->
-            {error, no_grisp_io_version};
-        {?GRISP_IO_VERSION_HEADER, ?GRISP_IO_VERSION} ->
-            {ok, Data};
-        {?GRISP_IO_VERSION_HEADER, Ver} ->
-            {error, {unsupported_grisp_io_version, Ver}}
     end.
 
 % Safe to call in any state

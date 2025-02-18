@@ -200,17 +200,17 @@ wait_disconnection() ->
 %--- Websocket Callbacks -------------------------------------------------------
 
 init(Req, Opts) ->
-    ExpVer = maps:get(expected_grisp_io_version, Opts, <<"1.0">>),
-    SelVer = maps:get(selected_grisp_io_version, Opts, <<"1.0">>),
-    case cowboy_req:header(<<"x-grisp-io-version">>, Req) of
+    ExpVer = maps:get(expected_protocol, Opts, <<"grisp-io-v1">>),
+    SelVer = maps:get(selected_protocol, Opts, <<"grisp-io-v1">>),
+    case cowboy_req:header(<<"sec-websocket-protocol">>, Req) of
         undefined ->
-            Req2 = cowboy_req:reply(400, #{}, <<"No Grisp.io version specified">>, Req),
+            Req2 = cowboy_req:reply(400, #{}, <<"No protocol specified">>, Req),
             {ok, Req2, Opts};
         ExpVer ->
-            Req2 = cowboy_req:set_resp_header(<<"x-grisp-io-version">>, SelVer, Req),
+            Req2 = cowboy_req:set_resp_header(<<"sec-websocket-protocol">>, SelVer, Req),
             {cowboy_websocket, Req2, Opts};
         _ ->
-            Req2 = cowboy_req:reply(400, #{}, <<"Unsupported Grisp.io Version">>, Req),
+            Req2 = cowboy_req:reply(400, #{}, <<"Unsupported Protocol">>, Req),
             {ok, Req2, Opts}
     end.
 
