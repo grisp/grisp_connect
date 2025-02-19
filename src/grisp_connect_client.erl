@@ -182,7 +182,7 @@ waiting_ip(state_timeout, check_ip, Data) ->
 
 % @doc State connecting is used to establish a connection to grisp.io.
 % If this is the first atempt at connecting, the delay will be 0,
-% otherwise it will come from the exponential backoff caclulation done
+% otherwise it will come from the exponential backoff calculation done
 % in the reconnect/2 function.
 connecting(enter, _OldState, #data{retry_delay = undefined}) ->
     % First connection do not have any delay
