@@ -96,7 +96,9 @@ bad_server_version_test(_) ->
         {ok, _} = application:ensure_all_started(grisp_connect),
         try
             % There is no way to know the reason why gun closed the connection
-            ?assertMatch({error, {closed, _}}, wait_connection())
+            % but we don't want jarl to crash because the protocol couldn't be
+            % negociated.
+            ?assertMatch({error, normal}, wait_connection())
         after
             ok = application:stop(grisp_connect)
         end

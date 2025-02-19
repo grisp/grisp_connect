@@ -88,7 +88,7 @@ reconnect_on_closed_frame_test(_) ->
 %--- Internal Functions --------------------------------------------------------
 
 connection_gun_pid() ->
-    {_, {data, _, _, _, _, ConnPid, _, _, _, _}} = sys:get_state(grisp_connect_client),
+    {_, {data, _, _, _, _, ConnPid, _, _, _, _, _}} = sys:get_state(grisp_connect_client),
     % Depends on the internal state of jarl_connection
     {_, {data, _, _, _, _, _, _, _, _, _, _, _, _, GunPid, _, _, _}} = sys:get_state(ConnPid),
     GunPid.

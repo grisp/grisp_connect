@@ -39,6 +39,8 @@
     ws_transport :: tcp | tls,
     conn :: undefined | pid(),
     retry_count = 0 :: non_neg_integer(),
+    % undefined for the first connection atempt
+    retry_delay :: undefined | pos_integer(),
     last_error :: term(),
     max_retries = infinity :: non_neg_integer() | infinity,
     wait_calls = [] :: [gen_statem:from()]
@@ -56,7 +58,11 @@
 
 -define(GRISP_IO_PROTOCOL, <<"grisp-io-v1">>).
 -define(FORMAT(FMT, ARGS), iolist_to_binary(io_lib:format(FMT, ARGS))).
--define(STD_TIMEOUT, 1000).
+-define(CHECK_IP_DELAY, 1000).
+-define(EXPBACKOFF_BASE_DELAY, 1000).
+-define(EXPBACKOFF_MAX_DELAY, 32000).
+-define(EXPBACKOFF_MULTIPLIER, 2).
+-define(EXPBACKOFF_JITTER, 1000).
 -define(CONNECT_TIMEOUT, 5000).
 -define(ENV(KEY, GUARDS), fun() ->
     case application:get_env(grisp_connect, KEY) of
@@ -156,26 +162,33 @@ idle(cast, connect, Data) ->
     {next_state, waiting_ip, Data};
 ?HANDLE_COMMON.
 
-waiting_ip(enter, _OldState, Data) ->
-    Delay = case Data#data.retry_count > 0 of
-        true -> ?STD_TIMEOUT;
-        false -> 0
-    end,
-    {keep_state_and_data, [{state_timeout, Delay, retry}]};
-waiting_ip(state_timeout, retry, Data = #data{retry_count = RetryCount}) ->
+% @doc State waiting_ip is used to check the device has an IP address.
+% The first time entering this state, the check will be performed right away.
+% If the device do not have an IP address, it will wait a fixed amount of time
+% and check again, without incrementing the retry counter.
+waiting_ip(enter, _OldState, _Data) ->
+    % First IP check do not have any delay
+    {keep_state_and_data, [{state_timeout, 0, check_ip}]};
+waiting_ip(state_timeout, check_ip, Data) ->
     case check_inet_ipv4() of
         {ok, IP} ->
             ?LOG_INFO(#{event => checked_ip, ip => IP}),
             {next_state, connecting, Data};
         invalid ->
             ?LOG_DEBUG(#{event => waiting_ip}),
-            {repeat_state, Data#data{retry_count = RetryCount + 1,
-                                     last_error = no_ip_available}}
+            {keep_state_and_data, [{state_timeout, ?CHECK_IP_DELAY, check_ip}]}
     end;
 ?HANDLE_COMMON.
 
-connecting(enter, _OldState, Data) ->
-    {keep_state, Data, [{state_timeout, 0, connect}]};
+% @doc State connecting is used to establish a connection to grisp.io.
+% If this is the first atempt at connecting, the delay will be 0,
+% otherwise it will come from the exponential backoff caclulation done
+% in the reconnect/2 function.
+connecting(enter, _OldState, #data{retry_delay = undefined}) ->
+    % First connection do not have any delay
+    {keep_state_and_data, [{state_timeout, 0, connect}]};
+connecting(enter, _OldState, #data{retry_delay = Delay}) ->
+    {keep_state_and_data, [{state_timeout, Delay, connect}]};
 connecting(state_timeout, connect, Data = #data{conn = undefined}) ->
     ?LOG_INFO(#{description => <<"Connecting to grisp.io">>,
                 event => connecting}),
@@ -196,7 +209,8 @@ connecting(info, {jarl, Conn, {connected, _}}, Data = #data{conn = Conn}) ->
     % Received from the connection process
     ?LOG_NOTICE(#{description => <<"Connected to grisp.io">>,
                   event => connected}),
-    {next_state, connected, Data#data{retry_count = 0}};
+    {next_state, connected, Data#data{retry_count = 0,
+                                      retry_delay = undefined}};
 ?HANDLE_COMMON.
 
 connected(enter, _OldState, Data = #data{wait_calls = WaitCalls}) ->
@@ -277,6 +291,17 @@ as_bin(Binary) when is_binary(Binary) -> Binary;
 as_bin(List) when is_list(List) -> list_to_binary(List);
 as_bin(Atom) when is_atom(Atom) -> atom_to_binary(Atom).
 
+%% @doc Calculate the next reconnection delay with exponential backoff.
+%% NextDelay = min(MaxDelay, LastDelay * Multiplier + Extra)
+%% Extra is a random number (-(V div 2) - (V rem 2)) and (V div 2),
+%% where V is the jitter value.
+next_connect_delay(undefined) ->
+    ?EXPBACKOFF_BASE_DELAY;
+next_connect_delay(LastDelay) ->
+    Jitter = ?EXPBACKOFF_JITTER,
+    Extra = rand:uniform(Jitter + 1) - (Jitter div 2) - (Jitter rem 2) - 1,
+    min(?EXPBACKOFF_MAX_DELAY, LastDelay * ?EXPBACKOFF_MULTIPLIER + Extra).
+
 handle_connection_message(_Data, {response, _Result, #{on_result := undefined}}) ->
     keep_state_and_data;
 handle_connection_message(Data, {response, Result, #{on_result := OnResult}}) ->
@@ -307,6 +332,9 @@ handle_connection_message(Data, Msg) ->
             keep_state_and_data
     end.
 
+% @doc Setup the state machine to rety connecting to grisp.io if the maximum
+% number of allowed atempts has not been reached.
+% Otherwise, the state machine will give up and go back to idle.
 reconnect(Data = #data{retry_count = RetryCount,
                        max_retries = MaxRetries,
                        last_error = LastError}, Reason)
@@ -314,12 +342,15 @@ reconnect(Data = #data{retry_count = RetryCount,
     Error = case Reason of undefined -> LastError; E -> E end,
     ?LOG_ERROR(#{description => <<"Max retries reached, giving up connecting to grisp.io">>,
                  event => max_retries_reached, last_error => LastError}),
-    {next_state, idle, Data#data{retry_count = 0, last_error = Error}};
-reconnect(Data = #data{retry_count = RetryCount,
+    {next_state, idle, Data#data{retry_count = 0, retry_delay = undefined,
+                                 last_error = Error}};
+reconnect(Data = #data{retry_count = RetryCount, retry_delay = LastDelay,
                        last_error = LastError}, Reason) ->
     Error = case Reason of undefined -> LastError; E -> E end,
+    NextDelay = next_connect_delay(LastDelay),
     {next_state, waiting_ip,
-     Data#data{retry_count = RetryCount + 1, last_error = Error}}.
+     Data#data{retry_count = RetryCount + 1, retry_delay = NextDelay,
+               last_error = Error}}.
 
 % Connection Functions
 
