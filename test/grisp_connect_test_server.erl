@@ -18,7 +18,7 @@
 -export([receive_jsonrpc_error/0]).
 -export([send_text/1]).
 -export([send_jsonrpc_notification/2]).
--export([send_jsonrpc_request/3]).
+-export([send_jsonrpc_request/2, send_jsonrpc_request/3]).
 -export([send_jsonrpc_result/2]).
 -export([send_jsonrpc_error/3]).
 -export([wait_disconnection/0]).
@@ -169,12 +169,16 @@ send_jsonrpc_notification(Method, Params) ->
             params => Params},
     send_text(jsx:encode(Map)).
 
+send_jsonrpc_request(Method, Params) ->
+    Id = list_to_binary(integer_to_list(erlang:unique_integer())),
+    send_jsonrpc_request(Method, Params, Id).
 send_jsonrpc_request(Method, Params, Id) ->
     Map = #{jsonrpc => <<"2.0">>,
             method => Method,
             params => Params,
             id => Id},
-    send_text(jsx:encode(Map)).
+    send_text(jsx:encode(Map)),
+    Id.
 
 send_jsonrpc_result(Result, Id) ->
     Map = #{jsonrpc => <<"2.0">>,

@@ -21,6 +21,10 @@ road for namespaces. foo.bar.Buz is parsed into [foo, bar, <<"Buz">>] (if foo
 and bar are already existing atoms, but 'Buz' is not).
 - Upgrade grisp dependency to 2.8.0.
 - Add jittered exponential backoff for reconnection.
+- Changed logging API from push to pull. Instead of the client (grisp_connect)
+pushing batches of log event to the server (grisp.io), the server is now pulling
+them with the request `log.get`. In order to synchronize the client ring buffer,
+the server sends `log.sync` notifications.
 
 ## Fixed
 
