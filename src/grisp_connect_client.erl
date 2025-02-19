@@ -338,7 +338,7 @@ handle_connection_message(Data, Msg) ->
 reconnect(Data = #data{retry_count = RetryCount,
                        max_retries = MaxRetries,
                        last_error = LastError}, Reason)
-  when MaxRetries =/= infinity, RetryCount > MaxRetries ->
+  when MaxRetries =/= infinity, RetryCount >= MaxRetries ->
     Error = case Reason of undefined -> LastError; E -> E end,
     ?LOG_ERROR(#{description => <<"Max retries reached, giving up connecting to grisp.io">>,
                  event => max_retries_reached, last_error => LastError}),
