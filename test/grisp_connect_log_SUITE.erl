@@ -28,7 +28,7 @@ all() ->
 
 init_per_suite(Config) ->
     CertDir = cert_dir(),
-    Apps = grisp_connect_test_server:start(CertDir),
+    Apps = grisp_connect_test_server:start(#{cert_dir => CertDir}),
     [{apps, Apps} | Config].
 
 end_per_suite(Config) ->

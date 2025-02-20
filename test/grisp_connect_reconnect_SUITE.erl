@@ -36,7 +36,7 @@ end_per_suite(Config) ->
     [?assertEqual(ok, application:stop(App)) || App <- ?config(apps, Config)].
 
 init_per_testcase(_, Config) ->
-    start_cowboy(cert_dir()),
+    start_cowboy(#{cert_dir => cert_dir()}),
     {ok, _} = application:ensure_all_started(grisp_emulation),
     application:set_env(grisp_connect, ws_ping_timeout, 120_000),
     {ok, _} = application:ensure_all_started(grisp_connect),
@@ -62,7 +62,7 @@ reconnect_on_disconnection_test(Config) ->
     ?assertMatch(ok, wait_connection()),
     stop_cowboy(),
     ?assertMatch(ok, wait_disconnection()),
-    start_cowboy(cert_dir()),
+    start_cowboy(#{cert_dir => cert_dir()}),
     ?assertMatch(ok, wait_connection(1200)),
     Config.
 
@@ -88,7 +88,7 @@ reconnect_on_closed_frame_test(_) ->
 %--- Internal Functions --------------------------------------------------------
 
 connection_gun_pid() ->
-    {_, {data, _, _, _, _, ConnPid, _}} = sys:get_state(grisp_connect_client),
+    {_, {data, _, _, _, _, ConnPid, _, _, _, _}} = sys:get_state(grisp_connect_client),
     % Depends on the internal state of jarl_connection
-    {_, {data, _, _, _, _, _, _, _, _, _, _, _, GunPid, _, _, _}} = sys:get_state(ConnPid),
+    {_, {data, _, _, _, _, _, _, _, _, _, _, _, _, GunPid, _, _, _}} = sys:get_state(ConnPid),
     GunPid.

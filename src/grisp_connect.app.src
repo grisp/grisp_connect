@@ -25,6 +25,7 @@
         {ws_path, "/grisp-connect/ws"},
         {ws_request_timeout, 5_000},
         {ws_ping_timeout, 60_000},
+        {ws_max_retries, infinity},
         {logs_interval, 2_000},
         {logs_batch_size, 100},
         {logger, [

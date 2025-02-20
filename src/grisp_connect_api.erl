@@ -15,6 +15,7 @@
 % @doc Handles requests and notifications from grisp.io.
 -spec handle_msg(Msg) ->
     ok | {reply, Result :: term(), ReqRef :: binary() | integer()}
+    | {error, Code :: integer() | atom(), Message :: binary() | undefined, ErData :: term(), ReqRef :: binary() | integer()}
   when Msg :: {request, Method :: jarl:method(), Params :: map() | list(), ReqRef :: binary() | integer()}
             | {notification, jarl:method(), Params :: map() | list()}.
 handle_msg({notification, M, Params}) ->

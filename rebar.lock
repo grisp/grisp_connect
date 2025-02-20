@@ -6,7 +6,7 @@
  {<<"gun">>,{pkg,<<"gun">>,<<"2.1.0">>},1},
  {<<"jarl">>,
   {git,"https://github.com/grisp/jarl.git",
-       {ref,"10085d38df19c67664d33ef61f515c92a8b0de56"}},
+       {ref,"24d53cc7b521b126588be1f36afecd1d4eb59db3"}},
   0},
  {<<"jsx">>,{pkg,<<"jsx">>,<<"3.1.0">>},0},
  {<<"mapz">>,{pkg,<<"mapz">>,<<"2.4.0">>},1}]}.
