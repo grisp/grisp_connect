@@ -39,8 +39,6 @@
     ws_transport :: tcp | tls,
     conn :: undefined | pid(),
     retry_count = 0 :: non_neg_integer(),
-    % undefined for the first connection atempt
-    retry_delay :: undefined | pos_integer(),
     last_error :: term(),
     max_retries = infinity :: non_neg_integer() | infinity,
     wait_calls = [] :: [gen_statem:from()]
@@ -58,11 +56,6 @@
 
 -define(GRISP_IO_PROTOCOL, <<"grisp-io-v1">>).
 -define(FORMAT(FMT, ARGS), iolist_to_binary(io_lib:format(FMT, ARGS))).
--define(CHECK_IP_DELAY, 1000).
--define(EXPBACKOFF_BASE_DELAY, 1000).
--define(EXPBACKOFF_MAX_DELAY, 32000).
--define(EXPBACKOFF_MULTIPLIER, 2).
--define(EXPBACKOFF_JITTER, 1000).
 -define(CONNECT_TIMEOUT, 5000).
 -define(ENV(KEY, GUARDS), fun() ->
     case application:get_env(grisp_connect, KEY) of
@@ -176,18 +169,19 @@ waiting_ip(state_timeout, check_ip, Data) ->
             {next_state, connecting, Data};
         invalid ->
             ?LOG_DEBUG(#{event => waiting_ip}),
-            {keep_state_and_data, [{state_timeout, ?CHECK_IP_DELAY, check_ip}]}
+            {keep_state_and_data, [{state_timeout, 1000, check_ip}]}
     end;
 ?HANDLE_COMMON.
 
 % @doc State connecting is used to establish a connection to grisp.io.
-% If this is the first atempt at connecting, the delay will be 0,
-% otherwise it will come from the exponential backoff calculation done
-% in the reconnect/2 function.
-connecting(enter, _OldState, #data{retry_delay = undefined}) ->
-    % First connection do not have any delay
+connecting(enter, _OldState, #data{retry_count = 0}) ->
     {keep_state_and_data, [{state_timeout, 0, connect}]};
-connecting(enter, _OldState, #data{retry_delay = Delay}) ->
+connecting(enter, _OldState, #data{retry_count = RetryCount}) ->
+    %% Calculate the connection delay with exponential backoff.
+    %% The delay is selected randomly between `1000' and
+    %% `2 ^ RETRY_COUNT - 1000' with a maximum value of `64000'.
+    Delay = 1000 + rand:uniform(min(64000, (1 bsl RetryCount) * 1000) - 1000),
+    ?LOG_DEBUG("Scheduling connection attempt in ~w ms", [Delay]),
     {keep_state_and_data, [{state_timeout, Delay, connect}]};
 connecting(state_timeout, connect, Data = #data{conn = undefined}) ->
     ?LOG_INFO(#{description => <<"Connecting to grisp.io">>,
@@ -209,8 +203,7 @@ connecting(info, {jarl, Conn, {connected, _}}, Data = #data{conn = Conn}) ->
     % Received from the connection process
     ?LOG_NOTICE(#{description => <<"Connected to grisp.io">>,
                   event => connected}),
-    {next_state, connected, Data#data{retry_count = 0,
-                                      retry_delay = undefined}};
+    {next_state, connected, Data#data{retry_count = 0}};
 ?HANDLE_COMMON.
 
 connected(enter, _OldState, Data = #data{wait_calls = WaitCalls}) ->
@@ -291,17 +284,6 @@ as_bin(Binary) when is_binary(Binary) -> Binary;
 as_bin(List) when is_list(List) -> list_to_binary(List);
 as_bin(Atom) when is_atom(Atom) -> atom_to_binary(Atom).
 
-%% @doc Calculate the next reconnection delay with exponential backoff.
-%% NextDelay = min(MaxDelay, LastDelay * Multiplier + Extra)
-%% Extra is a random number (-(V div 2) - (V rem 2)) and (V div 2),
-%% where V is the jitter value.
-next_connect_delay(undefined) ->
-    ?EXPBACKOFF_BASE_DELAY;
-next_connect_delay(LastDelay) ->
-    Jitter = ?EXPBACKOFF_JITTER,
-    Extra = rand:uniform(Jitter + 1) - (Jitter div 2) - (Jitter rem 2) - 1,
-    min(?EXPBACKOFF_MAX_DELAY, LastDelay * ?EXPBACKOFF_MULTIPLIER + Extra).
-
 handle_connection_message(_Data, {response, _Result, #{on_result := undefined}}) ->
     keep_state_and_data;
 handle_connection_message(Data, {response, Result, #{on_result := OnResult}}) ->
@@ -342,15 +324,15 @@ reconnect(Data = #data{retry_count = RetryCount,
     Error = case Reason of undefined -> LastError; E -> E end,
     ?LOG_ERROR(#{description => <<"Max retries reached, giving up connecting to grisp.io">>,
                  event => max_retries_reached, last_error => LastError}),
-    {next_state, idle, Data#data{retry_count = 0, retry_delay = undefined,
-                                 last_error = Error}};
-reconnect(Data = #data{retry_count = RetryCount, retry_delay = LastDelay,
-                       last_error = LastError}, Reason) ->
+    {next_state, idle, Data#data{retry_count = 0, last_error = Error}};
+reconnect(Data = #data{retry_count = RetryCount, last_error = LastError},
+          Reason) ->
     Error = case Reason of undefined -> LastError; E -> E end,
-    NextDelay = next_connect_delay(LastDelay),
+    % When reconnecting we always increment the retry counter, even if we
+    % where connected and it was reset to 0, the next step will always be
+    % retry number 1. It should never reconnect right away.
     {next_state, waiting_ip,
-     Data#data{retry_count = RetryCount + 1, retry_delay = NextDelay,
-               last_error = Error}}.
+     Data#data{retry_count = RetryCount + 1, last_error = Error}}.
 
 % Connection Functions
 

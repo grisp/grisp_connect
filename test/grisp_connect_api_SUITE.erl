@@ -94,12 +94,12 @@ exponential_backoff_test(_) ->
         end,
         T3a = receive
             {CallRef, init, V3} -> V3
-        after 1300 ->
+        after 2300 ->
             erlang:error(timeout3)
         end,
         T4a = receive
             {CallRef, init, V4} -> V4
-        after 2800 ->
+        after 4300 ->
             erlang:error(timeout4)
         end,
         {T1a, T2a, T3a, T4a}
@@ -126,7 +126,7 @@ exponential_backoff_test(_) ->
     try
         T5 = receive
             {CallRef, init, V5} -> V5
-        after 5800 ->
+        after 8300 ->
             erlang:error(timeout5)
         end,
 
@@ -135,13 +135,14 @@ exponential_backoff_test(_) ->
         D2 = timer:now_diff(T3, T2) div 1000,
         D3 = timer:now_diff(T4, T3) div 1000,
         D4 = timer:now_diff(T5, T4) div 1000,
-        ?assert(D1 < 300),
-        ?assert(D2 < 1300), % EXPBACKOFF_BASE_DELAY + 300
-        ?assert(D2 > 700), % EXPBACKOFF_BASE_DELAY - 300
-        ?assert(D3 < (D2 * 2 + 800)),
-        ?assert(D3 > (D2 * 2 - 800)),
-        ?assert(D4 < (D3 * 2 + 800)),
-        ?assert(D4 > (D3 * 2 - 800))
+        ?assert(D1 < 300, D1),
+        ?assert(D2 > 1000, D2),
+        ?assert(D2 < 100 + 1000 * 1 bsl 1, D2), % Extra 100 ms for safety
+        ?assert(D3 > 1000, D3),
+        ?assert(D3 < 100 + 1000 * 1 bsl 2, D3), % Extra 100 ms for safety
+        ?assert(D4 > 1000, D4),
+        ?assert(D4 < 100 + 1000 * 1 bsl 3, D4) % Extra 100 ms for safety
+
     catch
         C2:R2:S2 ->
             ok = application:stop(grisp_connect),
@@ -172,23 +173,22 @@ exponential_backoff_test(_) ->
             {ok, cowboy_req:reply(400, #{}, <<"Canceled">>, Req), Opts}
         end}),
     try
-        % First reconnection delay is EXPBACKOFF_BASE_DELAY
         T7 = receive
             {CallRef, init, V7} -> V7
-        after 1300 ->
+        after 2300 ->
             erlang:error(timeout7)
         end,
         T8 = receive
             {CallRef, init, V8} -> V8
-        after 2800 ->
+        after 4300 ->
             erlang:error(timeout8)
         end,
         D5 = timer:now_diff(T7, T6) div 1000,
         D6 = timer:now_diff(T8, T7) div 1000,
-        ?assert(D5 < 1300), % EXPBACKOFF_BASE_DELAY + 300
-        ?assert(D5 > 700), % EXPBACKOFF_BASE_DELAY - 300
-        ?assert(D6 < (D5 * 2 + 800)),
-        ?assert(D6 > (D5 * 2 - 800))
+        ?assert(D5 > 1000, D5),
+        ?assert(D5 < 100 + 1000 * 1 bsl 1, D5), % Extra 100 ms for safety
+        ?assert(D6 > 1000, D6),
+        ?assert(D6 < 100 + 1000 * 1 bsl 2, D6) % Extra 100 ms for safety
     after
         ok = application:stop(grisp_connect),
         application:set_env(grisp_connect, connect, OldConectEnv),
