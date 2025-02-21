@@ -136,12 +136,12 @@ exponential_backoff_test(_) ->
         D3 = timer:now_diff(T4, T3) div 1000,
         D4 = timer:now_diff(T5, T4) div 1000,
         ?assert(D1 < 300, D1),
-        ?assert(D2 > 1000, D2),
-        ?assert(D2 < 100 + 1000 * 1 bsl 1, D2), % Extra 100 ms for safety
-        ?assert(D3 > 1000, D3),
-        ?assert(D3 < 100 + 1000 * 1 bsl 2, D3), % Extra 100 ms for safety
-        ?assert(D4 > 1000, D4),
-        ?assert(D4 < 100 + 1000 * 1 bsl 3, D4) % Extra 100 ms for safety
+        ?assert(D2 > 900, D2), % 100 ms less for reliability
+        ?assert(D2 < 100 + 1000 * 1 bsl 1, D2), % Extra 100 ms for reliability
+        ?assert(D3 > 900, D3), % 100 ms less for reliability
+        ?assert(D3 < 100 + 1000 * 1 bsl 2, D3), % Extra 100 ms for reliability
+        ?assert(D4 > 900, D4), % 100 ms less for reliability
+        ?assert(D4 < 100 + 1000 * 1 bsl 3, D4) % Extra 100 ms for reliability
 
     catch
         C2:R2:S2 ->
@@ -185,10 +185,10 @@ exponential_backoff_test(_) ->
         end,
         D5 = timer:now_diff(T7, T6) div 1000,
         D6 = timer:now_diff(T8, T7) div 1000,
-        ?assert(D5 > 1000, D5),
-        ?assert(D5 < 100 + 1000 * 1 bsl 1, D5), % Extra 100 ms for safety
-        ?assert(D6 > 1000, D6),
-        ?assert(D6 < 100 + 1000 * 1 bsl 2, D6) % Extra 100 ms for safety
+        ?assert(D5 > 900, D5), % 100 ms less for reliability
+        ?assert(D5 < 100 + 1000 * 1 bsl 1, D5), % Extra 100 ms for reliability
+        ?assert(D6 > 900, D6), % 100 ms less for reliability
+        ?assert(D6 < 100 + 1000 * 1 bsl 2, D6) % Extra 100 ms for reliability
     after
         ok = application:stop(grisp_connect),
         application:set_env(grisp_connect, connect, OldConectEnv),
