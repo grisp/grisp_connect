@@ -180,7 +180,10 @@ connecting(enter, _OldState, #data{retry_count = RetryCount}) ->
     %% Calculate the connection delay with exponential backoff.
     %% The delay is selected randomly between `1000' and
     %% `2 ^ RETRY_COUNT - 1000' with a maximum value of `64000'.
-    Delay = 1000 + rand:uniform(min(64000, (1 bsl RetryCount) * 1000) - 1000),
+    MinDelay = 1000,
+    MaxDelay = 64000,
+    MaxRandomDelay = min(MaxDelay, (1 bsl RetryCount) * 1000) - MinDelay,
+    Delay = MinDelay + rand:uniform(MaxRandomDelay),
     ?LOG_DEBUG("Scheduling connection attempt in ~w ms", [Delay]),
     {keep_state_and_data, [{state_timeout, Delay, connect}]};
 connecting(state_timeout, connect, Data = #data{conn = undefined}) ->
