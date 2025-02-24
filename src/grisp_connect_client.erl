@@ -177,7 +177,7 @@ waiting_ip(state_timeout, check_ip, Data) ->
 connecting(enter, _OldState, #data{retry_count = 0}) ->
     {keep_state_and_data, [{state_timeout, 0, connect}]};
 connecting(enter, _OldState, #data{retry_count = RetryCount}) ->
-    %% Calculate the connection delay with exponential backoff.
+    %% Calculate the connection delay in milliseconds with exponential backoff.
     %% The delay is selected randomly between `1000' and
     %% `2 ^ RETRY_COUNT - 1000' with a maximum value of `64000'.
     MinDelay = 1000,
