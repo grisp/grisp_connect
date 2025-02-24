@@ -56,7 +56,6 @@
 
 -define(GRISP_IO_PROTOCOL, <<"grisp-io-v1">>).
 -define(FORMAT(FMT, ARGS), iolist_to_binary(io_lib:format(FMT, ARGS))).
--define(STD_TIMEOUT, 1000).
 -define(CONNECT_TIMEOUT, 5000).
 -define(ENV(KEY, GUARDS), fun() ->
     case application:get_env(grisp_connect, KEY) of
@@ -156,26 +155,38 @@ idle(cast, connect, Data) ->
     {next_state, waiting_ip, Data};
 ?HANDLE_COMMON.
 
-waiting_ip(enter, _OldState, Data) ->
-    Delay = case Data#data.retry_count > 0 of
-        true -> ?STD_TIMEOUT;
-        false -> 0
-    end,
-    {keep_state_and_data, [{state_timeout, Delay, retry}]};
-waiting_ip(state_timeout, retry, Data = #data{retry_count = RetryCount}) ->
+% @doc State waiting_ip is used to check the device has an IP address.
+% The first time entering this state, the check will be performed right away.
+% If the device do not have an IP address, it will wait a fixed amount of time
+% and check again, without incrementing the retry counter.
+waiting_ip(enter, _OldState, _Data) ->
+    % First IP check do not have any delay
+    {keep_state_and_data, [{state_timeout, 0, check_ip}]};
+waiting_ip(state_timeout, check_ip, Data) ->
     case check_inet_ipv4() of
         {ok, IP} ->
             ?LOG_INFO(#{event => checked_ip, ip => IP}),
             {next_state, connecting, Data};
         invalid ->
             ?LOG_DEBUG(#{event => waiting_ip}),
-            {repeat_state, Data#data{retry_count = RetryCount + 1,
-                                     last_error = no_ip_available}}
+            {keep_state_and_data, [{state_timeout, 1000, check_ip}]}
     end;
 ?HANDLE_COMMON.
 
-connecting(enter, _OldState, Data) ->
-    {keep_state, Data, [{state_timeout, 0, connect}]};
+% @doc State connecting is used to establish a connection to grisp.io.
+connecting(enter, _OldState, #data{retry_count = 0}) ->
+    {keep_state_and_data, [{state_timeout, 0, connect}]};
+connecting(enter, _OldState, #data{retry_count = RetryCount}) ->
+    %% Calculate the connection delay in milliseconds with exponential backoff.
+    %% The delay is selected randomly between `1000' and
+    %% `2 ^ RETRY_COUNT - 1000' with a maximum value of `64000'.
+    %% Loosely inspired by https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/
+    MinDelay = 1000,
+    MaxDelay = 64000,
+    MaxRandomDelay = min(MaxDelay, (1 bsl RetryCount) * 1000) - MinDelay,
+    Delay = MinDelay + rand:uniform(MaxRandomDelay),
+    ?LOG_DEBUG("Scheduling connection attempt in ~w ms", [Delay]),
+    {keep_state_and_data, [{state_timeout, Delay, connect}]};
 connecting(state_timeout, connect, Data = #data{conn = undefined}) ->
     ?LOG_INFO(#{description => <<"Connecting to grisp.io">>,
                 event => connecting}),
@@ -307,17 +318,23 @@ handle_connection_message(Data, Msg) ->
             keep_state_and_data
     end.
 
+% @doc Setup the state machine to rety connecting to grisp.io if the maximum
+% number of allowed atempts has not been reached.
+% Otherwise, the state machine will give up and go back to idle.
 reconnect(Data = #data{retry_count = RetryCount,
                        max_retries = MaxRetries,
                        last_error = LastError}, Reason)
-  when MaxRetries =/= infinity, RetryCount > MaxRetries ->
+  when MaxRetries =/= infinity, RetryCount >= MaxRetries ->
     Error = case Reason of undefined -> LastError; E -> E end,
     ?LOG_ERROR(#{description => <<"Max retries reached, giving up connecting to grisp.io">>,
                  event => max_retries_reached, last_error => LastError}),
     {next_state, idle, Data#data{retry_count = 0, last_error = Error}};
-reconnect(Data = #data{retry_count = RetryCount,
-                       last_error = LastError}, Reason) ->
+reconnect(Data = #data{retry_count = RetryCount, last_error = LastError},
+          Reason) ->
     Error = case Reason of undefined -> LastError; E -> E end,
+    % When reconnecting we always increment the retry counter, even if we
+    % where connected and it was reset to 0, the next step will always be
+    % retry number 1. It should never reconnect right away.
     {next_state, waiting_ip,
      Data#data{retry_count = RetryCount + 1, last_error = Error}}.
 

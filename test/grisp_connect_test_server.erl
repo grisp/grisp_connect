@@ -199,6 +199,8 @@ wait_disconnection() ->
 
 %--- Websocket Callbacks -------------------------------------------------------
 
+init(Req, Opts = #{init_callback := Fun}) when is_function(Fun, 2) ->
+    Fun(Req, Opts);
 init(Req, Opts) ->
     ExpVer = maps:get(expected_protocol, Opts, <<"grisp-io-v1">>),
     SelVer = maps:get(selected_protocol, Opts, <<"grisp-io-v1">>),

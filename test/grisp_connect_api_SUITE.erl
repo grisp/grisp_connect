@@ -34,7 +34,8 @@ all() ->
 
 init_per_testcase(TestCase, Config)
   when TestCase =:= bad_client_version_test;
-       TestCase =:= bad_server_version_test  ->
+       TestCase =:= bad_server_version_test;
+       TestCase =:= exponential_backoff_test  ->
     Config;
 init_per_testcase(TestCase, Config) ->
     CertDir = cert_dir(),
@@ -51,7 +52,8 @@ init_per_testcase(TestCase, Config) ->
 
 end_per_testcase(TestCase, Config)
     when TestCase =:= bad_client_version_test;
-         TestCase =:= bad_server_version_test  ->
+         TestCase =:= bad_server_version_test;
+         TestCase =:= exponential_backoff_test  ->
       Config;
 end_per_testcase(_, Config) ->
     ok = application:stop(grisp_connect),
@@ -62,6 +64,140 @@ end_per_testcase(_, Config) ->
 
 %--- Tests ---------------------------------------------------------------------
 
+exponential_backoff_test(_) ->
+    CertDir = cert_dir(),
+    CallRef = make_ref(),
+    Self = self(),
+
+    % First we test the exponential backoff algorithm when failing to connect
+
+    Apps = grisp_connect_test_server:start(#{
+        cert_dir => CertDir,
+        init_callback => fun(Req, Opts) ->
+            Self ! {CallRef, init, os:timestamp()},
+            {ok, cowboy_req:reply(400, #{}, <<"Canceled">>, Req), Opts}
+        end}),
+
+    {ok, _} = application:ensure_all_started(grisp_emulation),
+    application:load(grisp_connect),
+    {ok, OldConectEnv} = application:get_env(grisp_connect, connect),
+    application:set_env(grisp_connect, connect, false),
+    {ok, _} = application:ensure_all_started(grisp_connect),
+
+    {T1, T2, T3, T4} = try
+        T1a = os:timestamp(),
+        grisp_connect:connect(),
+        T2a = receive
+            {CallRef, init, V2} -> V2
+        after 300 ->
+            erlang:error(timeout2)
+        end,
+        T3a = receive
+            {CallRef, init, V3} -> V3
+        after 2300 ->
+            erlang:error(timeout3)
+        end,
+        T4a = receive
+            {CallRef, init, V4} -> V4
+        after 4300 ->
+            erlang:error(timeout4)
+        end,
+        {T1a, T2a, T3a, T4a}
+    catch
+        C1:R1:S1 ->
+            ok = application:stop(grisp_connect),
+            application:set_env(grisp_connect, connect, OldConectEnv),
+            erlang:raise(C1, R1, S1)
+    after
+        grisp_connect_test_server:wait_disconnection(),
+        ?assertEqual([], flush()),
+        grisp_connect_test_server:stop(Apps)
+    end,
+
+    % Then we allow the connection to succeed
+
+    grisp_connect_test_server:start(#{
+        cert_dir => CertDir,
+        init_callback => fun(Req, Opts) ->
+            Self ! {CallRef, init, os:timestamp()},
+            Req2 = cowboy_req:set_resp_header(<<"sec-websocket-protocol">>, <<"grisp-io-v1">>, Req),
+            {cowboy_websocket, Req2, Opts}
+        end}),
+    try
+        T5 = receive
+            {CallRef, init, V5} -> V5
+        after 8300 ->
+            erlang:error(timeout5)
+        end,
+
+        ?assertMatch(ok, wait_connection()),
+        D1 = timer:now_diff(T2, T1) div 1000,
+        D2 = timer:now_diff(T3, T2) div 1000,
+        D3 = timer:now_diff(T4, T3) div 1000,
+        D4 = timer:now_diff(T5, T4) div 1000,
+        ?assert(D1 < 300, D1),
+        ?assert(D2 > 900, D2), % 100 ms less for reliability
+        ?assert(D2 < 100 + 1000 * 1 bsl 1, D2), % Extra 100 ms for reliability
+        ?assert(D3 > 900, D3), % 100 ms less for reliability
+        ?assert(D3 < 100 + 1000 * 1 bsl 2, D3), % Extra 100 ms for reliability
+        ?assert(D4 > 900, D4), % 100 ms less for reliability
+        ?assert(D4 < 100 + 1000 * 1 bsl 3, D4) % Extra 100 ms for reliability
+
+    catch
+        C2:R2:S2 ->
+            ok = application:stop(grisp_connect),
+            application:set_env(grisp_connect, connect, OldConectEnv),
+            erlang:raise(C2, R2, S2)
+    after
+        grisp_connect_test_server:stop(Apps),
+        ?assertEqual([], flush())
+    end,
+
+    % Wait for grisp_connect to not be connected anymore
+    fun WaitNotConnected() ->
+        case grisp_connect:is_connected() of
+            false -> ok;
+            true ->
+                timer:sleep(50),
+                WaitNotConnected()
+        end
+    end(),
+    T6 = os:timestamp(),
+
+    % Finally we test the delay is reset when reconnecting
+
+    grisp_connect_test_server:start(#{
+        cert_dir => CertDir,
+        init_callback => fun(Req, Opts) ->
+            Self ! {CallRef, init, os:timestamp()},
+            {ok, cowboy_req:reply(400, #{}, <<"Canceled">>, Req), Opts}
+        end}),
+    try
+        T7 = receive
+            {CallRef, init, V7} -> V7
+        after 2300 ->
+            erlang:error(timeout7)
+        end,
+        T8 = receive
+            {CallRef, init, V8} -> V8
+        after 4300 ->
+            erlang:error(timeout8)
+        end,
+        D5 = timer:now_diff(T7, T6) div 1000,
+        D6 = timer:now_diff(T8, T7) div 1000,
+        ?assert(D5 > 900, D5), % 100 ms less for reliability
+        ?assert(D5 < 100 + 1000 * 1 bsl 1, D5), % Extra 100 ms for reliability
+        ?assert(D6 > 900, D6), % 100 ms less for reliability
+        ?assert(D6 < 100 + 1000 * 1 bsl 2, D6) % Extra 100 ms for reliability
+    after
+        ok = application:stop(grisp_connect),
+        application:set_env(grisp_connect, connect, OldConectEnv),
+        grisp_connect_test_server:wait_disconnection(),
+        ?assertEqual([], flush()),
+        grisp_connect_test_server:stop(Apps)
+    end,
+    ok.
+
 bad_client_version_test(_) ->
     CertDir = cert_dir(),
     Apps = grisp_connect_test_server:start(#{
@@ -70,12 +206,14 @@ bad_client_version_test(_) ->
     try
         {ok, _} = application:ensure_all_started(grisp_emulation),
         application:load(grisp_connect),
+        {ok, OldMaxRetryEnv} = application:get_env(grisp_connect, ws_max_retries),
         application:set_env(grisp_connect, ws_max_retries, 2),
         {ok, _} = application:ensure_all_started(grisp_connect),
         try
             ?assertMatch({error, ws_upgrade_failed}, wait_connection())
         after
-            ok = application:stop(grisp_connect)
+            ok = application:stop(grisp_connect),
+            application:set_env(grisp_connect, ws_max_retries, OldMaxRetryEnv)
         end
     after
         grisp_connect_test_server:wait_disconnection(),
@@ -92,13 +230,17 @@ bad_server_version_test(_) ->
     try
         {ok, _} = application:ensure_all_started(grisp_emulation),
         application:load(grisp_connect),
+        {ok, OldMaxRetryEnv} = application:get_env(grisp_connect, ws_max_retries),
         application:set_env(grisp_connect, ws_max_retries, 2),
         {ok, _} = application:ensure_all_started(grisp_connect),
         try
             % There is no way to know the reason why gun closed the connection
-            ?assertMatch({error, {closed, _}}, wait_connection())
+            % but we don't want jarl to crash because the protocol couldn't be
+            % negociated.
+            ?assertMatch({error, normal}, wait_connection())
         after
-            ok = application:stop(grisp_connect)
+            ok = application:stop(grisp_connect),
+            application:set_env(grisp_connect, ws_max_retries, OldMaxRetryEnv)
         end
     after
         grisp_connect_test_server:wait_disconnection(),
