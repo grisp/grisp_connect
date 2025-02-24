@@ -19,6 +19,7 @@ filtering out all progress messages, as it wasn't working reliably.
 - Jarl parses the methods into a list of atom or binaries to pave the
 road for namespaces. foo.bar.Buz is parsed into [foo, bar, <<"Buz">>] (if foo
 and bar are already existing atoms, but 'Buz' is not).
+- Upgrade grisp dependency to 2.8.0.
 
 ## Fixed
 
