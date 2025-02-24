@@ -180,6 +180,7 @@ connecting(enter, _OldState, #data{retry_count = RetryCount}) ->
     %% Calculate the connection delay in milliseconds with exponential backoff.
     %% The delay is selected randomly between `1000' and
     %% `2 ^ RETRY_COUNT - 1000' with a maximum value of `64000'.
+    %% Loosely inspired by https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/
     MinDelay = 1000,
     MaxDelay = 64000,
     MaxRandomDelay = min(MaxDelay, (1 bsl RetryCount) * 1000) - MinDelay,
