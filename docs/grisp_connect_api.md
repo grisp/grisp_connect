@@ -153,7 +153,7 @@ This should only be called if the new software is functioning as expected.
 | events *        | list of Events | The list of log events        |
 
 **`event format`:**
-Each log events are a list of two elements, first the sequence number of the
+Each log events is a list of two elements, first the sequence number of the
 event, and then an object describing the log event with the following fields:
  - `meta`: meta data of the log entry as an object:
    - `time`: log time in microseconds.
