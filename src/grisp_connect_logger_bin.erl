@@ -62,13 +62,25 @@
 sync(Seq, DroppedConfirmed) when
     is_integer(Seq), is_integer(DroppedConfirmed)
 ->
-    call(whereis(?MODULE), {sync, Seq, DroppedConfirmed}).
+    case whereis(?MODULE) of
+        undefined ->
+            ?LOG_WARNING("grisp_connect log handler not setup properly"),
+            ok;
+        Pid ->
+            call(Pid, {sync, Seq, DroppedConfirmed})
+    end.
 
 %% @doc
 %% The chunk will contain Count logs at maximum.
 %% while ensuring that the whole chunk is less then MaxBytes.
 chunk(MaxCount, MaxBytes) ->
-    insert_drop_event(call(whereis(?MODULE), {chunk, MaxCount, MaxBytes})).
+    case whereis(?MODULE) of
+        undefined ->
+            ?LOG_WARNING("grisp_connect log handler not setup properly"),
+            {[], 0};
+        Pid ->
+            insert_drop_event(call(Pid, {chunk, MaxCount, MaxBytes}))
+    end.
 
 %--- Behaviour logger_handler Callback Callbacks -------------------------------
 
