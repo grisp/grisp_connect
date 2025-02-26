@@ -153,33 +153,43 @@ grisp_connect sets the following options as default values if no `tls_server_tru
 ## See all Logs on GRiSP.io
 
 Once this app is started, it forwards all logs to GRiSP.io without the need of setting up anything. The only logs that we do not catch are the ones generated before `grisp_connect` boots.
-If you want to see ALL logs, even from applications that boot before `grisp_connect`, you need to disable the default logger handler and set the grisp_connect handler as the default one. This involves changing the `kernel` and `grisp_connect` app configuration settings in your sys.config file.
+If you want to see ALL logs, even from applications that boot before `grisp_connect`, you need to add the log handler in the kernel configuration and disable the one defined in the `grisp_connect` application configuration. This involves changing the `kernel` and `grisp_connect` app configuration settings in your sys.config file.
 
-You can copy paste these settings. Here we both swap the default logger handler with the grisp_connect logger handler and also request it to print logs to stdout.
+You can copy paste these settings:
 
 ```erlang
 % sys.config
 [
     {kernel, [
-        % Disable 'default' handler (which buffers all log events in logger).
-        {logger, [{handler, default, undefined}]}
-    ]},
-    {grisp_connect,[
+        {logger_level, notice},
         {logger, [
-            % Enable the grisp_connect handler as default,
-            % so that it will receive all events from boot
-            {handler,
-             default, % name
-             grisp_connect_logger_bin, % module
-             #{
-                formatter => {grisp_connect_logger_bin, #{
-                    % To see logs printed on the USB serial appoint a logger
-                    % formatter module of your choice and set the stdout
-                    % configuration stdout => {Formatter, FormatterConfig}
-                    stdout => {logger_formatter, #{}}
-                }}
+            {handler, default, logger_std_h, #{
+                level => notice,
+                filter_default => log,
+                filters => [
+                    % Filter out supervisor progress reports so TLS certificates
+                    % are not swamping the console if the level is set to info...
+                    {disable_progress, {fun logger_filters:progress/2, stop}}
+                ]
+            }}
+            {handler, grisp_connect_log_handler,  grisp_connect_logger_bin, #{
+                level => notice,
+                filter_default => log,
+                formatter => {grisp_connect_logger_bin, #{}},
+                filters => [
+                    % Filter out supervisor progress reports so TLS certificates
+                    % are not swamping grisp.io if level is set to info...
+                    {disable_progress, {fun logger_filters:progress/2, stop}}
+                ]
              }
             }
+        ]}
+    ]},
+    {grisp_connect, [
+        % Disable the log handler defined in grisp_connect application default
+        % configuration, as it was explicitly started in kernel configuration
+        % in order to catch the log entries before grisp_connect is started.
+        {logger, []}
         ]}
     ]}
 ].

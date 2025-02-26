@@ -19,14 +19,18 @@
   when Msg :: {request, Method :: jarl:method(), Params :: map() | list(), ReqRef :: binary() | integer()}
             | {notification, jarl:method(), Params :: map() | list()}.
 handle_msg({notification, M, Params}) ->
-    ?LOG_ERROR("Received unexpected notification ~p: ~p", [M, Params]),
-    ok;
-handle_msg({request, M, Params, ID})
-  when M == [?method_post]; M == [?method_get] ->
+    handle_notification(M, Params);
+handle_msg({request, M, Params, ID}) ->
     handle_request(M, Params, ID).
 
 
 %--- Internal Funcitons --------------------------------------------------------
+
+handle_notification([log, sync], Params) ->
+    grisp_connect_log:sync(Params);
+handle_notification(Method, Params) ->
+    ?LOG_ERROR("Received unexpected notification ~p: ~p", [Method, Params]),
+    ok.
 
 handle_request([?method_get], #{type := <<"system_info">>} = _Params, ID) ->
     Info = grisp_connect_updater:system_info(),
@@ -73,5 +77,8 @@ handle_request([?method_post], #{type := <<"cancel">>}, ID) ->
         ok ->
             {reply, ok, ID}
     end;
-handle_request(_T, _P, ID) ->
+handle_request([log, get], Params, ID) ->
+    {reply, grisp_connect_log:get(Params), ID};
+handle_request(Method, Params, ID) ->
+    ?LOG_ERROR("Received unexpected request ~p: ~p", [Method, Params]),
     {error, method_not_found, undefined, undefined, ID}.

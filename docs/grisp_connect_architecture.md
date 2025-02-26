@@ -6,10 +6,8 @@ graph TD
 
     subgraph GrispConnectApp[Grisp Connect Application]
         GrispConnectRootSup[Root Supervisor<br>grisp_connect_sup]
-        GrispConnectLogServer[Log Server<br>grisp_connect_log_server]
         GrispConnectClient[Client<br>grisp_connect_client]
 
-        GrispConnectRootSup --Supervise--> GrispConnectLogServer
         GrispConnectRootSup --Supervise--> GrispConnectClient
         GrispConnectClient --Spawn and Monitor--> JarlConnection
     end

@@ -137,6 +137,34 @@ This should only be called if the new software is functioning as expected.
 </p>
 </details>
 
+<details><summary><code>log.get</code> - retrieve a batch of log entry from the device </summary>
+<p>
+
+**`params`:**
+| key (required *)  | value    | description                            |
+| ----------------- | -------- | -------------------------------------- |
+| `"max_batch_size"`| integer  | Maximum number of events in the result |
+| `"max_byte_size"` | integer  | Maximum byte size of the result        |
+
+**`result`**:  JSON Object
+| key(required *) | value          | description                   |
+|-----------------|----------------|-------------------------------|
+| dropped *       | integer        | Number of dropped log entries |
+| events *        | list of Events | The list of log events        |
+
+**`event format`:**
+Each log event is a list of two elements, first the sequence number of the
+event, and then an object describing the log event with the following fields:
+ - `meta`: meta data of the log entry as an object:
+   - `time`: log time in microseconds.
+   - `file`: `null` or a filename as a string.
+   - `mfa`: `null` or the function the log is from as a list with module name
+            as a tring, function name as a string and arity as an integer.
+ - `msg`: the log entry message, either as a string, or as a json object if it
+          is a report entry.
+ - `level`: the log level as a string.
+
+
 ### Notifications
 
 <details><summary><code>update</code> <code>{"type":"software_update_event"}</code> - notify the current progess of grisp_updater </summary>
@@ -153,6 +181,16 @@ This should only be called if the new software is functioning as expected.
 
 </p>
 </details>
+
+<details><summary><code>log.sync</code> - synchronize the device log buffer, truncating the entries the server is aware of </summary>
+<p>
+
+**`params`:**
+| key (required *)  | value    | description                                      |
+| ----------------- | -------- | ------------------------------------------------ |
+| `"seq"` *         | integer  | The sequence number of the last stored log event |
+| `"dropped"` *     | integer  | The number of "confirmed dropped log events      |
+
 
 ## Error Codes
 

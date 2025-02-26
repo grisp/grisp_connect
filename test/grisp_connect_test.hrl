@@ -31,7 +31,8 @@
         (fun() ->
                 Send = grisp_connect_test_server:receive_jsonrpc_result(),
                 ?assertMatch(#{result := Value, id := Id}, Send),
-                ok
+                #{result := Result} = Send,
+                Result
         end)()).
 
 % Receive a JSON-RPC request error, pattern match code, message and id

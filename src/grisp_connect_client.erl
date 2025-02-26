@@ -213,7 +213,6 @@ connecting(info, {jarl, Conn, {connected, _}}, Data = #data{conn = Conn}) ->
 connected(enter, _OldState, Data = #data{wait_calls = WaitCalls}) ->
     % When entering connected, we reply to all wait_connected calls with ok
     gen_statem:reply([{reply, F, ok} || F <- WaitCalls]),
-    grisp_connect_log_server:start(),
     {keep_state, Data#data{wait_calls = [], last_error = undefined}};
 connected({call, From}, is_connected, _) ->
     {keep_state_and_data, [{reply, From, true}]};
@@ -371,13 +370,11 @@ conn_start(Data = #data{conn = undefined,
 conn_close(Data = #data{conn = undefined}, _Reason) ->
     Data;
 conn_close(Data = #data{conn = Conn}, _Reason) ->
-    grisp_connect_log_server:stop(),
     jarl:disconnect(Conn),
     Data#data{conn = undefined}.
 
 % Safe to call in any state
 conn_died(Data) ->
-    grisp_connect_log_server:stop(),
     Data#data{conn = undefined}.
 
 -spec conn_request(data(), jarl:method(), atom(), map(),
