@@ -49,8 +49,6 @@ disconnected from the server.
 
 ## [1.0.0] - 2024-09-26
 
-### What's Changed
-
 #### Added
 - NTP handling
 - Connect to GRiSP.io
@@ -60,8 +58,6 @@ disconnected from the server.
 - Use grisp_cryptoauth EMULATE_CRYPTOAUTH for tests and local shell.
 - Use grisp_cryptoauth TLS helper to generate TLS options.
 - Start integrating grisp updater.
-
-**Full Changelog**: https://github.com/grisp/grisp_connect/commits/1.0.0
 
 [Unreleased]: https://github.com/grisp/grisp_connect/compare/1.1.0...HEAD
 [1.1.0]: https://github.com/grisp/grisp_connect/compare/1.0.0...1.1.0
