@@ -186,6 +186,20 @@ event, and then an object describing the log event with the following fields:
           is a report entry.
  - `level`: the log level as a string.
 
+<details><summary><code>cluster.join</code> - Join to a remote Erlang Cluster</summary>
+
+**`params`:**
+| key (required *)  | value    | description                                       |
+| ----------------- | -------- | ------------------------------------------------- |
+| `"cookie"` *      | string   | The cookie                                        |
+| `"ca"` *          | binary   | The cluster CA as PEM encoded                     |
+| `"fingerprint"` * | binary   | the remote node certificate fingerprint in base64 |
+| `"nodename"` *    | string   | the remote node name                              |
+| `"hostname"` *    | string   | the remote node hostname                          |
+| `"address"` *     | string   | the remote node IP address                        |
+
+**`result`**:  boolean
+
 
 ### Notifications
 

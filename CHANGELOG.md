@@ -17,6 +17,7 @@ log string data.
 
 - Add the optional software and hardware information objects to the system
 info API result.
+- Add an API to make the the board join a Beam cluster using TLS distribution.
 
 ## [2.0.0] - 2025-02-26
 

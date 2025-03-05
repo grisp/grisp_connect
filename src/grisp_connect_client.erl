@@ -111,6 +111,7 @@ reboot() ->
 
 init([]) ->
     process_flag(trap_exit, true),
+    grisp_connect_cluster:init(),
     AutoConnect = ?ENV(connect, is_boolean(V)),
     Domain = ?ENV(domain, is_binary(V) orelse is_list(V) orelse is_atom(V), as_bin(V)),
     Port = ?ENV(port, is_integer(V) andalso V >= 0 andalso V < 65536),

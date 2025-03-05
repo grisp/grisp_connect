@@ -96,6 +96,17 @@ handle_request([?method_post], #{type := <<"cancel">>}, ID) ->
     end;
 handle_request([log, get], Params, ID) ->
     {reply, grisp_connect_log:get(Params), ID};
+handle_request([cluster, join],
+               #{cookie := CookieBin, ca := CAPemBin,
+                 fingerprint := FingerprintB64, nodename := NodeNameBin,
+                 hostname := HostnameBin, address := AddressBin}, ID) ->
+    Cookie = binary_to_atom(CookieBin),
+    Fingerprint = base64:decode(FingerprintB64),
+    Node = binary_to_atom(<<NodeNameBin/binary, "@", HostnameBin/binary>>),
+    {ok, Address} = inet:parse_ipv4_address(binary_to_list(AddressBin)),
+    Result = grisp_connect_cluster:join(Node, Cookie, CAPemBin, Fingerprint,
+                                        HostnameBin, Address),
+    {reply, Result, ID};
 handle_request(Method, Params, ID) ->
     ?LOG_ERROR("Received unexpected request ~p: ~p", [Method, Params]),
     {error, method_not_found, undefined, undefined, ID}.
