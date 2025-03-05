@@ -102,7 +102,7 @@ handle_request([cluster, join],
                  hostname := HostnameBin, address := AddressBin}, ID) ->
     Cookie = binary_to_atom(CookieBin),
     Fingerprint = base64:decode(FingerprintB64),
-    Node = binary_to_atom(<<NodeNameBin/binary, "@", HostnameBin/binary>>),
+    Node = binary_to_atom(NodeNameBin),
     {ok, Address} = inet:parse_ipv4_address(binary_to_list(AddressBin)),
     Result = grisp_connect_cluster:join(Node, Cookie, CAPemBin, Fingerprint,
                                         HostnameBin, Address),
