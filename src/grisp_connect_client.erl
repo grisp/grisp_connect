@@ -165,10 +165,13 @@ waiting_ip(enter, _OldState, _Data) ->
 waiting_ip(state_timeout, check_ip, Data) ->
     case check_inet_ipv4() of
         {ok, IP} ->
-            ?LOG_INFO(#{event => checked_ip, ip => IP}),
+            ?LOG_DEBUG(#{description => ?FORMAT("IP Address available: ~s",
+                                                [format_ipv4(IP)]),
+                         event => checked_ip, ip => format_ipv4(IP)}),
             {next_state, connecting, Data};
         invalid ->
-            ?LOG_DEBUG(#{event => waiting_ip}),
+            ?LOG_DEBUG(#{description => <<"Waiting for an IP address do connect to grisp.io">>,
+                         event => waiting_ip}),
             {keep_state_and_data, [{state_timeout, 1000, check_ip}]}
     end;
 ?HANDLE_COMMON.
@@ -188,14 +191,14 @@ connecting(enter, _OldState, #data{retry_count = RetryCount}) ->
     ?LOG_DEBUG("Scheduling connection attempt in ~w ms", [Delay]),
     {keep_state_and_data, [{state_timeout, Delay, connect}]};
 connecting(state_timeout, connect, Data = #data{conn = undefined}) ->
-    ?LOG_INFO(#{description => <<"Connecting to grisp.io">>,
+    ?LOG_INFO(#{description => <<"Connecting to grisp.io ...">>,
                 event => connecting}),
     case conn_start(Data) of
         {ok, Data2} ->
             {keep_state, Data2, [{state_timeout, ?CONNECT_TIMEOUT, timeout}]};
         {error, Reason} ->
-            ?LOG_WARNING("Failed to connect to grisp.io: ~p", [Reason],
-                         #{event => connection_failed, reason => Reason}),
+            ?LOG_WARNING(#{description => ?FORMAT("Failed to connect to grisp.io: ~p", [Reason]),
+                           event => connection_failed, reason => Reason}),
             reconnect(Data, Reason)
     end;
 connecting(state_timeout, timeout, Data) ->
@@ -246,11 +249,13 @@ handle_common(info, reboot, _, _) ->
     init:stop(),
     keep_state_and_data;
 handle_common(info, {'EXIT', Conn, Reason}, _State, Data = #data{conn = Conn}) ->
-    % The connection process died
-    ?LOG_WARNING(#{description =>
-                    ?FORMAT("The connection to grisp.io died: ~p", [Reason]),
-                   event => connection_failed, reason => Reason}),
-    reconnect(conn_died(Data), Reason);
+    RealReason = case Reason of
+        {shutdown, R} -> R;
+        R -> R
+    end,
+    ?LOG_WARNING(#{description => ?FORMAT("Connection to grisp.io terminated: ~p", [RealReason]),
+                   event => connection_failed, reason => RealReason}),
+    reconnect(conn_died(Data), RealReason);
 handle_common(info, {'EXIT', _Conn, _Reason}, _State, _Data) ->
     % Ignore any EXIT from past jarl connections
     keep_state_and_data;
@@ -262,11 +267,9 @@ handle_common(cast, Cast, _, _) ->
     error({unexpected_cast, Cast});
 handle_common({call, _}, Call, _, _) ->
     error({unexpected_call, Call});
-handle_common(info, Info, State, Data) ->
-    ?LOG_ERROR(#{event => unexpected_info,
-                 info => Info,
-                 state => State,
-                 data => Data}),
+handle_common(info, Info, State, _Data) ->
+    ?LOG_WARNING(#{description => <<"Unexpected message">>,
+                   event => unexpected_info, info => Info, state => State}),
     keep_state_and_data.
 
 
@@ -286,6 +289,9 @@ generic_errors() -> [
 as_bin(Binary) when is_binary(Binary) -> Binary;
 as_bin(List) when is_list(List) -> list_to_binary(List);
 as_bin(Atom) when is_atom(Atom) -> atom_to_binary(Atom).
+
+format_ipv4({A, B, C, D}) ->
+    ?FORMAT("~w.~w.~w.~w", [A, B, C, D]).
 
 handle_connection_message(_Data, {response, _Result, #{on_result := undefined}}) ->
     keep_state_and_data;
