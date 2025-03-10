@@ -1,22 +1,45 @@
 -module(grisp_connect_ntp).
 
-% API
--export([start_link/0]).
--export([get_time/0, get_time/1]).
-
 -behaviour(gen_statem).
--export([init/1, terminate/3, code_change/4, callback_mode/0, handle_event/4]).
-
--define(NTP_PORT,       123).                   % udp
--define(SERVER_TIMEOUT, 5000).                  % ms
--define(EPOCH,          2208988800).            % offset yr 1900 to unix epochù
--define(RETRY_TIMEOUT, 1000).
 
 -include_lib("kernel/include/logger.hrl").
 
 
+%--- Exports -------------------------------------------------------------------
 
-% API
+% API functions
+-export([start_link/0]).
+-export([get_time/0, get_time/1]).
+
+% Behaviour gen_statem callback functions
+-export([callback_mode/0]).
+-export([init/1]).
+
+% Behaviour gen_statem states callback functions
+-export([waiting_ip/3]).
+-export([refresh_time/3]).
+-export([ready/3]).
+
+
+%--- Types ---------------------------------------------------------------------
+
+-record(data, {
+    retry_count = 0 :: non_neg_integer()
+}).
+
+
+%--- Macros --------------------------------------------------------------------
+
+-define(NTP_PORT, 123). % NTP's UDP port
+-define(EPOCH, 2208988800). % offset yr 1900 to unix epochù
+-define(REFRESH_TIMEOUT, 1000 * 256). % ms
+
+-define(HANDLE_COMMON,
+    ?FUNCTION_NAME(EventType, EventContent, Data) ->
+        handle_common(EventType, EventContent, ?FUNCTION_NAME, Data)).
+
+
+%--- API FUNCTIONS -------------------------------------------------------------
 
 start_link() ->
     gen_statem:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -27,82 +50,127 @@ get_time() ->
 get_time(Host) ->
     gen_statem:call(?MODULE, {?FUNCTION_NAME, Host}).
 
-% gen_statem CALLBACKS ---------------------------------------------------------
 
-init([]) -> {ok, waiting_ip, []}.
+%--- BEHAVIOUR gen_statem CALLBACK FUNCTIONS -----------------------------------
 
-terminate(_Reason, _State, _Data) -> ok.
+callback_mode() -> [state_functions, state_enter].
 
-code_change(_Vsn, State, Data, _Extra) -> {ok, State, Data}.
+init([]) -> {ok, waiting_ip, #data{}}.
 
-callback_mode() -> [handle_event_function, state_enter].
 
-%%% STATE CALLBACKS ------------------------------------------------------------
 
-handle_event({call, From}, {get_time, _}, State, Data) when State =/= ready ->
-    {keep_state, Data, [{reply, From, {error, State}}]};
+%--- BEHAVIOUR gen_statem STATES CALLBACK FUNCTIONS -----------------------------
 
-handle_event(enter, _OldState, ready, Data) ->
-    {keep_state, Data};
-handle_event({call, From}, {get_time, Host}, ready, Data) ->
-    {keep_state, Data, [{reply, From, do_get_time(Host)}]};
-
-handle_event(enter, _OldState, waiting_ip, Data) ->
-    {next_state, waiting_ip, Data, [{state_timeout, ?RETRY_TIMEOUT, retry}]};
-handle_event(state_timeout, retry, waiting_ip, Data) ->
-    case check_inet_ipv4() of
-        true ->
-            ?LOG_INFO("ip detected, tryng to contact ntp server..."),
-            {next_state, waiting_server, Data};
-        false ->
-            {next_state, waiting_ip, Data,
-                                    [{state_timeout, ?RETRY_TIMEOUT, retry}]}
+waiting_ip(enter, _OldState, _Data) ->
+    % First IP check do not have any delay
+    {keep_state_and_data, [{state_timeout, 0, check_ip}]};
+waiting_ip(state_timeout, check_ip, Data) ->
+    case grisp_connect_utils:check_inet_ipv4() of
+        {ok, _IP} -> {next_state, refresh_time, Data};
+        invalid -> {keep_state_and_data, [{state_timeout, 1000, check_ip}]}
     end;
+?HANDLE_COMMON.
 
-handle_event(enter, _OldState, waiting_server, Data) ->
-    {next_state, waiting_server, Data,
-                                [{state_timeout, ?RETRY_TIMEOUT, retry}]};
-handle_event(state_timeout, retry, waiting_server, Data) ->
-    try
-        set_current_time(),
-        ?LOG_INFO("Grisp clock set!"),
-        {next_state, ready, Data}
-    catch
-        Ex:Er ->
-            ?LOG_ERROR("ntp request failed: ~p, ~p",[Ex,Er]),
-            {next_state, waiting_server, Data,
-                                    [{state_timeout, ?RETRY_TIMEOUT, retry}]}
-    end;
+refresh_time(enter, _OldState, #data{retry_count = RetryCount}) ->
+    Delay = grisp_connect_utils:retry_delay(RetryCount),
+    {keep_state_and_data, [{state_timeout, Delay, request_time}]};
+refresh_time(state_timeout, request_time,
+             Data = #data{retry_count = RetryCount}) ->
+    NTPServer = random_ntp_server(),
+    case refresh_current_time(NTPServer) of
+        {error, Reason} ->
+            ?LOG_INFO("Failed to get time from NTP server ~s: ~w",
+                      [NTPServer, Reason]),
+            {next_state, waiting_ip, Data#data{retry_count = RetryCount + 1}};
+        {ok, Datetime} ->
+            ?LOG_NOTICE("GRiSP clock set from NTP to ~s",
+                        [format_datetime(Datetime)]),
+            {next_state, ready, Data#data{retry_count = 0}}
+    end.
 
-handle_event( E, OldS, NewS, Data) ->
-    ?LOG_WARNING("Unhandled Event = ~p, OldS = ~p, NewS = ~p",[E, OldS, NewS]),
-    {keep_state, Data}.
+ready(enter, _OldState, _Data) ->
+    ?LOG_DEBUG("Schedule NTP time refresh in ~w ms", [?REFRESH_TIMEOUT]),
+    {keep_state_and_data, [{state_timeout, ?REFRESH_TIMEOUT, refresh_time}]};
+ready({call, From}, {get_time, Host}, _Data) ->
+    Reply = case do_get_time(Host) of
+        {error, _Reason} = Error -> Error;
+        {ok, Time} -> {ok, Time}
+    end,
+    {keep_state_and_data, [{reply, From, Reply}]};
+ready(state_timeout, refresh_time, Data) ->
+    {next_state, refresh_time, Data};
+?HANDLE_COMMON.
 
-% INTERNALS --------------------------------------------------------------------
+handle_common({call, _From}, {get_time, _Host}, _State, _Data) ->
+    {keep_state_and_data, [postpone]};
+handle_common({call, From}, Msg, State, _Data) ->
+    ?LOG_WARNING("Unexpected call from ~w in state ~w: ~w",
+                 [From, State, Msg]),
+    {keep_state_and_data, [{reply, From, {error, unexpected_call}}]};
+handle_common(cast, Msg, State, _Data) ->
+    ?LOG_WARNING("Unexpected cast in state ~w: ~w", [State, Msg]),
+    keep_state_and_data;
+handle_common(info, Msg, State, _Data) ->
+    ?LOG_DEBUG("Unexpected message in state ~w: ~w", [State, Msg]),
+    keep_state_and_data.
 
-set_current_time() ->
-    Time = do_get_time(random_ntp_server()),
-    RefTS1970 = round(proplists:get_value(receiveTimestamp, (tuple_to_list(Time)))),
-    CurrSecs = calendar:datetime_to_gregorian_seconds({{1970, 1, 1}, {0, 0, 0}}) + RefTS1970,
-    CurrDateTime = calendar:gregorian_seconds_to_datetime(CurrSecs),
-    grisp_rtems:clock_set({CurrDateTime, 0}).
+
+%--- INTERNAL FUNCTIONS --------------------------------------------------------
+
+format_datetime({{Year, Month, Day}, {Hour, Min, Sec}}) ->
+    iolist_to_binary(io_lib:format(
+        "~4..0B-~2..0B-~2..0B ~2..0B:~2..0B:~2..0B",
+        [Year, Month, Day, Hour, Min, Sec]
+    )).
+
+refresh_current_time(NTPServer) ->
+    case do_get_time(NTPServer) of
+        {error, _Reason} = Error -> Error;
+        {ok, Time} ->
+            try
+                RefTS1970 = round(proplists:get_value(receiveTimestamp, (tuple_to_list(Time)))),
+                CurrSecs = calendar:datetime_to_gregorian_seconds({{1970, 1, 1}, {0, 0, 0}}) + RefTS1970,
+                CurrDateTime = calendar:gregorian_seconds_to_datetime(CurrSecs),
+                grisp_rtems:clock_set({CurrDateTime, 0}),
+                {ok, CurrDateTime}
+            catch
+                _:Reason -> {error, Reason}
+            end
+    end.
 
 ntp_servers() ->
-    ["0.europe.pool.ntp.org"].
+    {ok, NTPServers} = application:get_env(grisp_connect, ntp_servers),
+    NTPServers.
 
 random_ntp_server() ->
     lists:nth(rand:uniform(length(ntp_servers())), ntp_servers()).
 
 do_get_time(Host) ->
-    Resp = ntp_request(Host, create_ntp_request()),
-    process_ntp_response(Resp) .
+    case ntp_request(Host, create_ntp_request()) of
+        {error, _Reason} = Error -> Error;
+        {ok, Resp} ->
+            try process_ntp_response(Resp) of
+                Time -> {ok, Time}
+            catch _:Reason ->
+                {error, Reason}
+            end
+        end.
 
 ntp_request(Host, Binary) ->
-    {ok, Socket} = gen_udp:open(0, [binary, {active, false}]),
-    gen_udp:send(Socket, Host, ?NTP_PORT, Binary),
-    {ok, {_Address, _Port, Resp}} = gen_udp:recv(Socket, 0, 500),
-    gen_udp:close(Socket),
-    Resp.
+    case gen_udp:open(0, [binary, {active, false}]) of
+        {error, _Reason} = Error -> Error;
+        {ok, Socket} ->
+            try gen_udp:send(Socket, Host, ?NTP_PORT, Binary) of
+                {error, _Reason} = Error -> Error;
+                ok ->
+                    case gen_udp:recv(Socket, 0, 500) of
+                        {error, _Reason} = Error -> Error;
+                        {ok, {_Address, _Port, Resp}} -> {ok, Resp}
+                    end
+            after
+                gen_udp:close(Socket)
+            end
+        end.
 
 process_ntp_response(Ntp_response) ->
     <<LI:2, Version:3, Mode:3, Stratum:8, Poll:8/signed, Precision:8/signed,
@@ -131,41 +199,3 @@ binfrac(0, _, Frac) ->
     Frac;
 binfrac(Bin, N, Frac) ->
     binfrac(Bin bsr 1, N*2, Frac + (Bin band 1)/N).
-
-% INET IP CHECK UTILS ----------------------------------------------------------
-
-check_inet_ipv4() ->
-    case get_ip_of_valid_interfaces() of
-        {_,_,_,_} = IP when IP =/= {127,0,0,1} -> true;
-        _ -> false
-    end.
-
-get_ipv4_from_opts([]) ->
-    undefined;
-get_ipv4_from_opts([{addr, {_1, _2, _3, _4}} | _]) ->
-    {_1, _2, _3, _4};
-get_ipv4_from_opts([_ | TL]) ->
-    get_ipv4_from_opts(TL).
-
-has_ipv4(Opts) ->
-    get_ipv4_from_opts(Opts) =/= undefined.
-
-flags_are_ok(Flags) ->
-    lists:member(up, Flags) and
-        lists:member(running, Flags) and
-        not lists:member(loopback, Flags).
-
-get_valid_interfaces() ->
-    {ok, Interfaces} = inet:getifaddrs(),
-    [
-        Opts
-     || {_Name, [{flags, Flags} | Opts]} <- Interfaces,
-        flags_are_ok(Flags),
-        has_ipv4(Opts)
-    ].
-
-get_ip_of_valid_interfaces() ->
-    case get_valid_interfaces() of
-        [Opts | _] -> get_ipv4_from_opts(Opts);
-        _ -> undefined
-    end.

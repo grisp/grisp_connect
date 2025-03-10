@@ -21,6 +21,7 @@
         {port, 443},
         {connect, true}, % keeps a constant connection with grisp.io
         {ntp, false}, % if set to true, starts the NTP client
+        {ntp_servers, ["0.europe.pool.ntp.org"]},
         {ws_transport, tls},
         {ws_path, "/grisp-connect/ws"},
         {ws_request_timeout, 5_000},
