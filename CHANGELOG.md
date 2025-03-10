@@ -8,6 +8,11 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Changed
+
+- Add log event metadata instead of prepending "[JSON incompatible term]" to
+log string data.
+
 ## [2.0.0] - 2025-02-26
 
 ### Changed
