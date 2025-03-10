@@ -58,9 +58,10 @@ jsonify_msg(#{msg := {report, Report}} = Event) ->
             maps:put(msg, Report, Event);
         false ->
             String = unicode:characters_to_binary(
-                       io_lib:format("[JSON incompatible term]~n~tp", [Report])
-                      ),
-            maps:put(msg, String, Event)
+                       io_lib:format("~tp", [Report])),
+            Meta = maps:get(meta, Event, #{}),
+            Event2 = Event#{meta => Meta#{incompatible_term => true}},
+            maps:put(msg, String, Event2)
     end;
 jsonify_msg(#{msg := {FormatString, Term}} = Event) ->
     %FIXME: scan format and ensure unicode encoding

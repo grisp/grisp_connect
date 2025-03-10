@@ -168,7 +168,7 @@ structured_logs_test(_) ->
              #{event => #{<<"errör"/utf8>> => false}},
              #{event => 1234},
              #{event => 0.1},
-             <<"[JSON incompatible term]\n#{event => {äh,bäh}}"/utf8>>],
+             <<"#{event => {äh,bäh}}"/utf8>>],
     % Ensure there is at least one log entry, so LastSeq is defined
     grisp_connect:log(error, ["dummy"]),
     LastSeq = log_reset(),
