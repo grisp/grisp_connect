@@ -85,7 +85,8 @@ refresh_time(state_timeout, request_time,
             ?LOG_NOTICE("GRiSP clock set from NTP to ~s",
                         [format_datetime(Datetime)]),
             {next_state, ready, Data#data{retry_count = 0}}
-    end.
+    end;
+?HANDLE_COMMON.
 
 ready(enter, _OldState, _Data) ->
     Period = refresh_period(),
