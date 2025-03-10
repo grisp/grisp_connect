@@ -195,6 +195,27 @@ You can copy paste these settings:
 ].
 ```
 
+To simplify the log on the device while still sending full log reports to
+griso.io, use grisp_connect_log log formatter with single-line in the default
+log handler:
+
+```
+            {handler, default, logger_std_h, #{
+                level => notice,
+                formatter => {grisp_connect_log, #{
+                    legacy_header => false,
+                    single_line => true,
+                    description_only => true
+                }},
+                filter_default => log,
+                filters => [
+                    % Filter out supervisor progress reports so TLS certificates
+                    % are not swamping the console if the level is set to info...
+                    {disable_progress, {fun logger_filters:progress/2, stop}}
+                ]
+            }}
+```
+
 ## Development
 
 ### Local Development
