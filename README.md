@@ -119,6 +119,8 @@ authenticate with GRiSP.io. The client sets the time using
 The default NTP servers to use can be overridden by setting the `grisp_connect`
 option: `{ntp_servers, ["ntp1.server.foo", "ntp2.server.foo"]}`. For every NTP
 requests, a server address will be picked randomly from the list.
+The default refresh period in seconds can be overridden by setting the
+`grisp_connect` option: `{ntp_refresh_period, 1024}`.
 
 ### `ws_request_timeout`
 

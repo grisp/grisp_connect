@@ -32,7 +32,6 @@
 
 -define(NTP_PORT, 123). % NTP's UDP port
 -define(EPOCH, 2208988800). % offset yr 1900 to unix epochù
--define(REFRESH_TIMEOUT, 1000 * 256). % ms
 
 -define(HANDLE_COMMON,
     ?FUNCTION_NAME(EventType, EventContent, Data) ->
@@ -89,8 +88,9 @@ refresh_time(state_timeout, request_time,
     end.
 
 ready(enter, _OldState, _Data) ->
-    ?LOG_DEBUG("Schedule NTP time refresh in ~w ms", [?REFRESH_TIMEOUT]),
-    {keep_state_and_data, [{state_timeout, ?REFRESH_TIMEOUT, refresh_time}]};
+    Period = refresh_period(),
+    ?LOG_DEBUG("Schedule NTP time refresh in ~w seconds", [Period]),
+    {keep_state_and_data, [{state_timeout, Period * 1000, refresh_time}]};
 ready({call, From}, {get_time, Host}, _Data) ->
     Reply = case do_get_time(Host) of
         {error, _Reason} = Error -> Error;
@@ -141,6 +141,11 @@ refresh_current_time(NTPServer) ->
 ntp_servers() ->
     {ok, NTPServers} = application:get_env(grisp_connect, ntp_servers),
     NTPServers.
+
+% NTP refresh perido in seconds
+refresh_period() ->
+    {ok, Period} = application:get_env(grisp_connect, ntp_refresh_period),
+    Period.
 
 random_ntp_server() ->
     lists:nth(rand:uniform(length(ntp_servers())), ntp_servers()).
