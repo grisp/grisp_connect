@@ -163,7 +163,7 @@ waiting_ip(enter, _OldState, _Data) ->
     % First IP check do not have any delay
     {keep_state_and_data, [{state_timeout, 0, check_ip}]};
 waiting_ip(state_timeout, check_ip, Data) ->
-    case check_inet_ipv4() of
+    case grisp_connect_utils:check_inet_ipv4() of
         {ok, IP} ->
             ?LOG_INFO(#{event => checked_ip, ip => IP}),
             {next_state, connecting, Data};
@@ -174,17 +174,8 @@ waiting_ip(state_timeout, check_ip, Data) ->
 ?HANDLE_COMMON.
 
 % @doc State connecting is used to establish a connection to grisp.io.
-connecting(enter, _OldState, #data{retry_count = 0}) ->
-    {keep_state_and_data, [{state_timeout, 0, connect}]};
 connecting(enter, _OldState, #data{retry_count = RetryCount}) ->
-    %% Calculate the connection delay in milliseconds with exponential backoff.
-    %% The delay is selected randomly between `1000' and
-    %% `2 ^ RETRY_COUNT - 1000' with a maximum value of `64000'.
-    %% Loosely inspired by https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/
-    MinDelay = 1000,
-    MaxDelay = 64000,
-    MaxRandomDelay = min(MaxDelay, (1 bsl RetryCount) * 1000) - MinDelay,
-    Delay = MinDelay + rand:uniform(MaxRandomDelay),
+    Delay = grisp_connect_utils:retry_delay(RetryCount),
     ?LOG_DEBUG("Scheduling connection attempt in ~w ms", [Delay]),
     {keep_state_and_data, [{state_timeout, Delay, connect}]};
 connecting(state_timeout, connect, Data = #data{conn = undefined}) ->
@@ -405,41 +396,3 @@ conn_error(#data{conn = Conn}, Code, Message, ErData, ReqRef)
 conn_error(Data, Code, Message, ErData, ReqRef) ->
     BinErData = iolist_to_binary(io_lib:format("~p", [ErData])),
     conn_error(Data, Code, Message, BinErData, ReqRef).
-
-% IP check functions
-
-check_inet_ipv4() ->
-    case get_ip_of_valid_interfaces() of
-        {IP1,_,_,_} = IP when IP1 =/= 127 -> {ok, IP};
-        _ -> invalid
-    end.
-
-get_ipv4_from_opts([]) ->
-    undefined;
-get_ipv4_from_opts([{addr, {_1, _2, _3, _4}} | _]) ->
-    {_1, _2, _3, _4};
-get_ipv4_from_opts([_ | TL]) ->
-    get_ipv4_from_opts(TL).
-
-has_ipv4(Opts) ->
-    get_ipv4_from_opts(Opts) =/= undefined.
-
-flags_are_ok(Flags) ->
-    lists:member(up, Flags) and
-        lists:member(running, Flags) and
-        not lists:member(loopback, Flags).
-
-get_valid_interfaces() ->
-    {ok, Interfaces} = inet:getifaddrs(),
-    [
-        Opts
-     || {_Name, [{flags, Flags} | Opts]} <- Interfaces,
-        flags_are_ok(Flags),
-        has_ipv4(Opts)
-    ].
-
-get_ip_of_valid_interfaces() ->
-    case get_valid_interfaces() of
-        [Opts | _] -> get_ipv4_from_opts(Opts);
-        _ -> undefined
-    end.
