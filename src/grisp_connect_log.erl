@@ -2,11 +2,17 @@
 %% @end
 -module(grisp_connect_log).
 
+-behaviour(logger_formatter).
+
 -include_lib("kernel/include/logger.hrl").
 
 % API functions
 -export([get/1]).
 -export([sync/1]).
+
+% Behaviour logger_formatter callback functions
+-export([check_config/1]).
+-export([format/2]).
 
 %--- Macros --------------------------------------------------------------------
 
@@ -43,6 +49,24 @@ get(Opts) ->
 -spec sync(Opts :: sync_options()) -> ok.
 sync(#{seq := Seq, dropped := Dropped}) ->
     grisp_connect_logger_bin:sync(Seq, Dropped).
+
+
+%--- Beahviour logger_formatter Callback Functions -----------------------------
+
+check_config(Config = #{description_only := Bool})
+  when is_boolean(Bool) ->
+    logger_formatter:check_config(maps:remove(description_only, Config));
+check_config(#{description_only := V}) ->
+    {error, {invalid_formatter_config, ?MODULE, {description_only, V}}};
+check_config(Config) ->
+    logger_formatter:check_config(Config).
+
+format(LogEvent = #{msg := {report, #{description := Desc}}},
+       Config = #{description_only := true}) when is_binary(Desc) ->
+    logger_formatter:format(LogEvent#{msg := {string, Desc}},
+                            maps:remove(description_only, Config));
+format(LogEvent, Config) ->
+    logger_formatter:format(LogEvent, maps:remove(description_only, Config)).
 
 
 %--- Internal Functions --------------------------------------------------------
