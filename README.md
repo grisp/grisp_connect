@@ -113,7 +113,12 @@ In such case the state machine that maintains the connection can be started manu
 ### `ntp`
 
 An optional NTP client can be started using option `{ntp, true}`.
-Such client is disabled by default (`{ntp, false}`), and is not required to authenticate with GRiSP.io. The client sets the time using `grisp_rtems:clock_set/1`
+Such client is disabled by default (`{ntp, false}`), and is not required to
+authenticate with GRiSP.io. The client sets the time using
+`grisp_rtems:clock_set/1`.
+The default NTP servers to use can be overridden by setting the `grisp_connect`
+option: `{ntp_servers, ["ntp1.server.foo", "ntp2.server.foo"]}`. For every NTP
+requests, a server address will be picked randomly from the list.
 
 ### `ws_request_timeout`
 
