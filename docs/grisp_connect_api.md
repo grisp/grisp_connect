@@ -186,20 +186,43 @@ event, and then an object describing the log event with the following fields:
           is a report entry.
  - `level`: the log level as a string.
 
-<details><summary><code>cluster.join</code> - Join to a remote Erlang Cluster</summary>
+<details><summary><code>cluster.join</code> - Join to a remote Erlang Node</summary>
+
+**`params`:**
+| key (required *)  | value    | description                                            |
+| ----------------- | -------- | ------------------------------------------------------ |
+| `"cookie"` *      | string   | The cookie                                             |
+| `"ca"` *          | binary   | The cluster CA as PEM encoded                          |
+| `"fingerprint"` * | binary   | the remote node certificate fingerprint in base64      |
+| `"nodename"` *    | string   | the remote node name                                   |
+| `"hostname"` *    | string   | the remote node hostname                               |
+| `"address"` *     | string   | the remote node IP address                             |
+| `"monitor"`       | boolean  | if the device should try to reconnect (default: false) |
+
+**`result`**:  boolean
+If the device was able to join the remote node. If `monitor` parameter is `true`,
+even though the result is `false` the device will keep retrying to connect until
+`cluster.leave` is called.
+
+<details><summary><code>cluster.leave</code> - Leave a remote Erlang Node</summary>
 
 **`params`:**
 | key (required *)  | value    | description                                       |
 | ----------------- | -------- | ------------------------------------------------- |
-| `"cookie"` *      | string   | The cookie                                        |
-| `"ca"` *          | binary   | The cluster CA as PEM encoded                     |
-| `"fingerprint"` * | binary   | the remote node certificate fingerprint in base64 |
 | `"nodename"` *    | string   | the remote node name                              |
-| `"hostname"` *    | string   | the remote node hostname                          |
-| `"address"` *     | string   | the remote node IP address                        |
 
 **`result`**:  boolean
+If the node was connected or monitored by the device.
 
+<details><summary><code>cluster.list</code> - Retturn the list of cluster the device has joined</summary>
+
+**`params`:** `{}`
+
+**`result`**:  List of clusters:
+| key (required *)  | value    | description                                            |
+| ----------------- | -------- | ------------------------------------------------------ |
+| `"nodename"` *    | string   | The node name the device has joined                    |
+| `"connected"` *   | boolean  | If the device is currently connected to it             |
 
 ### Notifications
 

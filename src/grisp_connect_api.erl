@@ -21,7 +21,15 @@
 handle_msg({notification, M, Params}) ->
     handle_notification(M, Params);
 handle_msg({request, M, Params, ID}) ->
-    handle_request(M, Params, ID).
+    try
+        handle_request(M, Params, ID)
+    catch
+        _:R ->
+            ?LOG_ERROR("Error while processing request ~s: ~p",
+                       [jarl_utils:format_method(M), R]),
+            ReasonBinary = iolist_to_binary(io_lib:format("~p", [R])),
+            {error, internal_error, ReasonBinary, undefined, ID}
+    end.
 
 
 %--- Internal Funcitons --------------------------------------------------------
@@ -96,17 +104,30 @@ handle_request([?method_post], #{type := <<"cancel">>}, ID) ->
     end;
 handle_request([log, get], Params, ID) ->
     {reply, grisp_connect_log:get(Params), ID};
-handle_request([cluster, join],
-               #{cookie := CookieBin, ca := CAPemBin,
-                 fingerprint := FingerprintB64, nodename := NodeNameBin,
-                 hostname := HostnameBin, address := AddressBin}, ID) ->
-    Cookie = binary_to_atom(CookieBin),
-    Fingerprint = base64:decode(FingerprintB64),
+handle_request([cluster, join], Params, ID) ->
+    #{cookie := CookieBin, ca := CAPemBin, nodename := NodeNameBin,
+        fingerprint := FingerprintB64, hostname := HostnameBin,
+        address := AddressBin} = Params,
     Node = binary_to_atom(NodeNameBin),
     {ok, Address} = inet:parse_ipv4_address(binary_to_list(AddressBin)),
-    Result = grisp_connect_cluster:join(Node, Cookie, CAPemBin, Fingerprint,
-                                        HostnameBin, Address),
-    {reply, Result, ID};
+    Opts = #{
+        hostname => HostnameBin,
+        address => Address,
+        cookie => binary_to_atom(CookieBin),
+        ca => CAPemBin,
+        fingerprint => base64:decode(FingerprintB64),
+        monitor => maps:get(monitor, Params, false)
+    },
+    case grisp_connect_cluster:join(Node, Opts) of
+        error -> {reply, false, ID};
+        IsConnected -> {reply, IsConnected, ID}
+    end;
+handle_request([cluster, leave], Params, ID) ->
+    #{nodename := NodeNameBin} = Params,
+    Node = binary_to_atom(NodeNameBin),
+    {reply, grisp_connect_cluster:leave(Node), ID};
+handle_request([cluster, list], #{}, ID) ->
+    {reply, grisp_connect_cluster:list(), ID};
 handle_request(Method, Params, ID) ->
     ?LOG_ERROR("Received unexpected request ~p: ~p", [Method, Params]),
     {error, method_not_found, undefined, undefined, ID}.
