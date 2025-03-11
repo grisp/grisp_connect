@@ -137,6 +137,11 @@ handle_info(Info, State) ->
 
 %--- Internal Funcitons --------------------------------------------------------
 
+clear_disp_pem_cache() ->
+    % ssl:clear_pem_cache/0 doesn't support distribution, hacking around...
+    gen_server:call(ssl_pem_cache:name(dist),
+                    {unconditionally_clear_pem_cache, self()}, infinity).
+
 required(atom, Key, Map) ->
     case maps:find(Key, Map) of
         {ok, V} when is_atom(V) -> V;
@@ -196,6 +201,7 @@ store_ca_certs(State = #state{peers = Peers}) ->
     CAPemItems = unique([P#peer.ca || P <- maps:values(Peers)]),
     Data = lists:join("\n", CAPemItems),
     ok = file:write_file(Filename, Data),
+    clear_disp_pem_cache(),
     State.
 
 connect_node(State, Peer = #peer{node = Node}) ->

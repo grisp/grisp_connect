@@ -214,7 +214,7 @@ even though the result is `false` the device will keep retrying to connect until
 **`result`**:  boolean
 If the node was connected or monitored by the device.
 
-<details><summary><code>cluster.list</code> - Retturn the list of cluster the device has joined</summary>
+<details><summary><code>cluster.list</code> - Return the list of cluster the device has joined</summary>
 
 **`params`:** `{}`
 
