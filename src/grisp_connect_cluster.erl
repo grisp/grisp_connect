@@ -201,10 +201,7 @@ store_board_certs(State) ->
     end.
 
 store_ca_certs(State = #state{peers = Peers}) ->
-    Filename = case ?IS_EMULATED of
-        true -> "local.peers.CA.pem";
-        false -> "/etc/peers.CA.pem"
-    end,
+    {ok, Filename} = application:get_env(grisp_connect, allowed_ca_chain),
     CAPemItems = unique([P#peer.ca || P <- maps:values(Peers)]),
     Data = lists:join("\n", CAPemItems),
     ok = file:write_file(Filename, Data),
@@ -232,21 +229,24 @@ connect_node(State, Peer = #peer{node = Node}) ->
     end.
 
 join_node(State, Peer = #peer{node = Node}) ->
-    Peer2 = case find_peer(State, Node) of
-        {ok, Peer} -> Peer;
+    {State2, Peer2} = case find_peer(State, Node) of
+        {ok, Peer} ->
+            {State, Peer};
         {ok, OldPeer} ->
             ?LOG_DEBUG(#{
                 description => ?FORMAT("Update node ~w cluster configuration", [Node]),
                 event => cluster_update, node => Node}),
             unregister_peer(State, disconnect_peer(OldPeer)),
-            register_peer(Peer);
+            NewPeer = register_peer(Peer),
+            {store_ca_certs(set_peer(State, NewPeer)), NewPeer};
         error ->
             ?LOG_DEBUG(#{
                 description => ?FORMAT("Register node ~w cluster configuration", [Node]),
                 event => cluster_register, node => Node}),
-            register_peer(Peer)
+            NewPeer = register_peer(Peer),
+            {store_ca_certs(set_peer(State, NewPeer)), NewPeer}
     end,
-    connect_node(store_ca_certs(set_peer(State, Peer2)), Peer2).
+    connect_node(State2, Peer2).
 
 leave_node(State, Node) ->
     case find_peer(State, Node) of
@@ -271,7 +271,7 @@ retry_node(State, Node) ->
             {error, State};
         {ok, Peer} ->
             Peer2 = Peer#peer{timer_ref = undefined},
-            connect_node(store_ca_certs(set_peer(State, Peer2)), Peer2)
+            connect_node(set_peer(State, Peer2), Peer2)
     end.
 
 node_down(State, Node, Info) ->
