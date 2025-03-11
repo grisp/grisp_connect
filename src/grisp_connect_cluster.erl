@@ -24,6 +24,9 @@
 -export([handle_cast/2]).
 -export([handle_info/2]).
 
+% Disable dialyzer warnings
+-dialyzer({nowarn_function, clear_disp_pem_cache/0}).
+
 
 %--- Types ---------------------------------------------------------------------
 
@@ -139,8 +142,12 @@ handle_info(Info, State) ->
 
 clear_disp_pem_cache() ->
     % ssl:clear_pem_cache/0 doesn't support distribution, hacking around...
-    gen_server:call(ssl_pem_cache:name(dist),
-                    {unconditionally_clear_pem_cache, self()}, infinity).
+    try gen_server:call(ssl_pem_cache:name(dist),
+                        {unconditionally_clear_pem_cache, self()}, infinity)
+    catch exit:{noproc,_} ->
+        % No distribution PEM cache running
+        ok
+    end.
 
 required(atom, Key, Map) ->
     case maps:find(Key, Map) of
