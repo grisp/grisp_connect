@@ -43,6 +43,8 @@ release name and version and if update is enabled.
 | update_progress | integer        | optional | The progress as a percentage                                     |
 | update_message  | string         | optional | Message describing the current state of the system               |
 | action_required | boolean        | optional | `"reboot"`, `"remove_sdcard_and_reboot"` or `"validate"`         |
+| software        | object         | optional | Object describing the software running in the device             |
+| hardware        | object         | optional | Object describing the hardware of the device                     |
 
 Meaning of the status:
 
@@ -53,6 +55,26 @@ Meaning of the status:
 | `"canceled"`      | The update was canceled, a new update can be initiated                                     |
 | `"failed"`        | The update failed, a new update can be initiated                                           |
 | `"updated"`       | The update succeed, but actions are required like "reboot" or "validate"                   |
+
+Software description object:
+
+| key               | value          | description                                                                         |
+|-------------------|----------------|-------------------------------------------------------------------------------------|
+| `"id"`            | string or null | The software unique identifier                                                      |
+| `"relname"`       | string or null | The name of the release deployed on the device                                      |
+| `"relvsn"`        | string or null | The version of the release deployed on the device                                   |
+| `"toolchain_rev"` | string or null | The revision hash of the toolchain used to build the release deployed on the device |
+| `"rtems_ver"`     | string or null | The RTEMS version of the software depployed on the device                           |
+| `"otp_ver"`       | string or null | The OTP version of the software depployed on the device                             |
+
+Hardware description object:
+
+| key               | value          | description                                                                         |
+|-------------------|----------------|-------------------------------------------------------------------------------------|
+| `"platform"`      | string         | The hardware platform name                                                          |
+| `"version"`       | string         | The hardware version                                                                |
+| `"serial"`        | string         | The hardware serial number                                                          |
+| `"batch"`         | integer        | The hardware batch number                                                           |
 
 </p>
 </details>
