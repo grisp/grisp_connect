@@ -26,6 +26,18 @@ handle_msg({request, M, Params, ID}) ->
 
 %--- Internal Funcitons --------------------------------------------------------
 
+maybe_put(Map, []) -> Map;
+maybe_put(Map, [{Key, Fun, Filter} | Rest]) ->
+    maybe_put(maybe_put(Map, Key, Fun, Filter), Rest).
+
+maybe_put(Map, Key, Fun, Filter) ->
+    try Fun() of
+        V when is_map(V) -> Map#{Key => maps:with(Filter, V)};
+        _ -> Map
+    catch
+      _:_ -> Map
+    end.
+
 handle_notification([log, sync], Params) ->
     grisp_connect_log:sync(Params);
 handle_notification(Method, Params) ->
@@ -33,7 +45,12 @@ handle_notification(Method, Params) ->
     ok.
 
 handle_request([?method_get], #{type := <<"system_info">>} = _Params, ID) ->
-    Info = grisp_connect_updater:system_info(),
+    Info = maybe_put(grisp_connect_updater:system_info(), [
+        {software, fun grisp_info:software/0,
+         [id, relname, relvsn, profiles, toolchain_rev, rtems_ver, otp_ver]},
+        {hardware, fun grisp_info:hardware/0,
+         [platform, version, serial, batch]}
+    ]),
     {reply, Info, ID};
 handle_request([?method_post], #{type := <<"start_update">>} = Params, ID) ->
     try

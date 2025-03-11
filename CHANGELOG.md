@@ -13,6 +13,11 @@ and this project adheres to
 - Add log event metadata instead of prepending "[JSON incompatible term]" to
 log string data.
 
+### Added
+
+- Add the optional software and hardware information objects to the system
+info API result.
+
 ## [2.0.0] - 2025-02-26
 
 ### Changed
