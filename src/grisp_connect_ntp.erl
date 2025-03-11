@@ -82,8 +82,8 @@ refresh_time(state_timeout, request_time,
                       [NTPServer, Reason]),
             {next_state, waiting_ip, Data#data{retry_count = RetryCount + 1}};
         {ok, Datetime} ->
-            ?LOG_NOTICE("GRiSP clock set from NTP to ~s",
-                        [format_datetime(Datetime)]),
+            ?LOG_INFO("GRiSP clock set from NTP to ~s",
+                      [format_datetime(Datetime)]),
             {next_state, ready, Data#data{retry_count = 0}}
     end;
 ?HANDLE_COMMON.
