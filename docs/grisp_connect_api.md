@@ -37,7 +37,10 @@ release name and version and if update is enabled.
 |-----------------|----------------|----------|------------------------------------------------------------------|
 | relname         | string or null | required | The name of the release running currently on the device          |
 | relvsn          | string or null | required | The version of the release running currently on the device       |
-| update_enabled  | boolean        | required | If updating is enbaled on the device                             |
+| cluster_enabled | boolean        | required | If clustering is enabled on the device                           |
+| nodename        | string         | required | The device node name                                             |
+| hostname        | string         | required | The device hostname                                              |
+| update_enabled  | boolean        | required | If updating is enabled on the device                             |
 | boot_source     | map            | optional | `{"type": "system", "id": ID}` or `{"type": "removable"}`        |
 | update_status   | string         | optional | `"ready"`, `"updating"`, `"canceled"`, `"failed"`, or `"updated"`|
 | update_progress | integer        | optional | The progress as a percentage                                     |
@@ -204,6 +207,12 @@ If the device was able to join the remote node. If `monitor` parameter is `true`
 even though the result is `false` the device will keep retrying to connect until
 `cluster.leave` is called.
 
+**`error`**:
+
+| Error Content                                       | When it Happens                    |
+| ----------------------------------------------------| ---------------------------------- |
+| `{code: -14, message: "grisp_cluster_unavailable"}` | Grisp cluster API is not available |
+
 <details><summary><code>cluster.leave</code> - Leave a remote Erlang Node</summary>
 
 **`params`:**
@@ -214,6 +223,12 @@ even though the result is `false` the device will keep retrying to connect until
 **`result`**:  boolean
 If the node was connected or monitored by the device.
 
+**`error`**:
+
+| Error Content                                       | When it Happens                    |
+| ----------------------------------------------------| ---------------------------------- |
+| `{code: -14, message: "grisp_cluster_unavailable"}` | Grisp cluster API is not available |
+
 <details><summary><code>cluster.list</code> - Return the list of cluster the device has joined</summary>
 
 **`params`:** `{}`
@@ -223,6 +238,12 @@ If the node was connected or monitored by the device.
 | ----------------- | -------- | ------------------------------------------------------ |
 | `"nodename"` *    | string   | The node name the device has joined                    |
 | `"connected"` *   | boolean  | If the device is currently connected to it             |
+
+**`error`**:
+
+| Error Content                                       | When it Happens                    |
+| ----------------------------------------------------| ---------------------------------- |
+| `{code: -14, message: "grisp_cluster_unavailable"}` | Grisp cluster API is not available |
 
 ### Notifications
 

@@ -53,7 +53,9 @@ handle_notification(Method, Params) ->
     ok.
 
 handle_request([?method_get], #{type := <<"system_info">>} = _Params, ID) ->
-    Info = maybe_put(grisp_connect_updater:system_info(), [
+    ClusterInfo = grisp_connect_cluster:system_info(),
+    UpdateInfo = grisp_connect_updater:system_info(),
+    Info = maybe_put(maps:merge(ClusterInfo, UpdateInfo), [
         {software, fun grisp_info:software/0,
          [id, relname, relvsn, profiles, toolchain_rev, rtems_ver, otp_ver]},
         {hardware, fun grisp_info:hardware/0,

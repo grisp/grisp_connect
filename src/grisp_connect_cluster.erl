@@ -13,6 +13,7 @@
 
 % API Functions
 -export([start_link/0]).
+-export([system_info/0]).
 -export([join/2]).
 -export([leave/1]).
 -export([list/0]).
@@ -67,6 +68,14 @@
 
 start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
+
+system_info() ->
+    {ok, Hostname} = inet:gethostname(),
+    #{
+        cluster_enabled => true,
+        nodename => node(),
+        hostname => list_to_binary(Hostname)
+    }.
 
 -spec join(Node :: atom(), Opts :: node_options()) -> true | false | error.
 join(Node, Opts) when is_atom(Node), is_map(Opts) ->
