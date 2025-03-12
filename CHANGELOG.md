@@ -8,10 +8,17 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [2.1.0] - 2025-03-12
+
 ### Changed
 
 - Add log event metadata instead of prepending "[JSON incompatible term]" to
 log string data.
+- The NTP client was made a bit more robust with exponential backoff.
+- The NTP client server list can be parametrised with grisp_connect's ntp_servers
+environment key.
+- The NTP client is now refreshing the time periodically, and the period can
+be configured with grisp_connect's ntp_refresh_period environment key.
 
 ### Added
 
@@ -73,7 +80,8 @@ disconnected from the server.
 - Use grisp_cryptoauth TLS helper to generate TLS options.
 - Start integrating grisp updater.
 
-[Unreleased]: https://github.com/grisp/grisp_connect/compare/2.0.0...HEAD
+[Unreleased]: https://github.com/grisp/grisp_connect/compare/2.1.0...HEAD
+[2.01.0]: https://github.com/grisp/grisp_connect/compare/2.0.0...2.1.0
 [2.0.0]: https://github.com/grisp/grisp_connect/compare/1.1.0...2.0.0
 [1.1.0]: https://github.com/grisp/grisp_connect/compare/1.0.0...1.1.0
 [1.0.0]: https://github.com/grisp/grisp_connect/compare/6b59d16383b3e5154ef839bcf5c77a6b770aada5...1.0.0
