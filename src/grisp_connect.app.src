@@ -7,6 +7,7 @@
         kernel,
         inets,
         stdlib,
+        public_key,
         jsx,
         jarl,
         grisp,
@@ -28,6 +29,8 @@
         {ws_request_timeout, 5_000},
         {ws_ping_timeout, 60_000},
         {ws_max_retries, infinity},
+        % Must be writable and match the cacertfile in ssl_dist_opts.rel
+        {allowed_ca_chain, "/etc/peers.CA.pem"},
         {logs_batch_size, 100},
         {logger, [
             % Enable our own default handler,

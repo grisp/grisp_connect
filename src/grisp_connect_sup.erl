@@ -39,6 +39,7 @@ init([]) ->
         {ok, false} -> []
     end,
     ChildSpecs = NTP ++ [
+        worker(grisp_connect_cluster, []),
         worker(grisp_connect_client, [])
     ],
     {ok, {SupFlags, ChildSpecs}}.
