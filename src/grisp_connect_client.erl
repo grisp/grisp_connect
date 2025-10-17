@@ -345,7 +345,7 @@ conn_start(Data = #data{conn = undefined,
     WsReqTimeout = ?ENV(ws_request_timeout, V =:= infinity orelse is_integer(V)),
     ConnTransport = case WsTransport of
         tcp -> tcp;
-        tls -> {tls, grisp_cryptoauth_tls:options(Domain)}
+        tls -> {tls, grisp_keychain:tls_options(Domain)}
     end,
     ErrorList = persistent_term:get({?MODULE, self()}),
     ConnOpts = #{
