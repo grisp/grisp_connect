@@ -28,6 +28,7 @@
         {ws_request_timeout, 5_000},
         {ws_ping_timeout, 60_000},
         {ws_max_retries, infinity},
+        {allow_expired_certs, false},
         % Must be writable and match the cacertfile in ssl_dist_opts.rel
         {board_certificate, "/etc/board.pem"},
         {allowed_ca_chain, "/etc/peers.CA.pem"},

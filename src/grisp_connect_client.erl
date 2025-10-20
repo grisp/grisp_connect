@@ -345,7 +345,7 @@ conn_start(Data = #data{conn = undefined,
     WsReqTimeout = ?ENV(ws_request_timeout, V =:= infinity orelse is_integer(V)),
     ConnTransport = case WsTransport of
         tcp -> tcp;
-        tls -> {tls, grisp_keychain:tls_options(Domain)}
+        tls -> {tls, tls_options(Domain)}
     end,
     ErrorList = persistent_term:get({?MODULE, self()}),
     ConnOpts = #{
@@ -402,3 +402,12 @@ conn_error(#data{conn = Conn}, Code, Message, ErData, ReqRef)
 conn_error(Data, Code, Message, ErData, ReqRef) ->
     BinErData = iolist_to_binary(io_lib:format("~p", [ErData])),
     conn_error(Data, Code, Message, BinErData, ReqRef).
+
+tls_options(Domain) ->
+    ExtraOpts = case application:get_env(grisp_connect, allow_expired_certs) of
+        {ok, false} -> [];
+        {ok, true} ->
+            [{verify_fun,
+                {fun grisp_connect_crypto:skip_cert_expired/3, []}}]
+    end,
+    grisp_keychain:tls_options(Domain) ++ ExtraOpts.

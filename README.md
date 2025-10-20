@@ -28,6 +28,7 @@ make sure to add `grisp_updater_grisp2` as a dependency in your project as well.
     - [`logs_interval`](#logs_interval)
     - [`logs_batch_size`](#logs_batch_size)
     - [Custom TLS options](#custom-tls-options)
+      - [`allow_expired_certs`](#allow_expired_certs)
   - [See all Logs on GRiSP.io](#see-all-logs-on-grispio)
   - [Development](#development)
     - [Local Development](#local-development)
@@ -156,6 +157,8 @@ grisp_connect sets the following options as default values if no `tls_server_tru
         ]}
     ]
 ```
+#### `allow_expired_certs`
+`grisp_connect` will ignore `cert_expired` errors during certificate path validation. This should only be used for development. Default is `false`.
 
 ## See all Logs on GRiSP.io
 
