@@ -40,7 +40,6 @@ init_per_testcase(TestCase, Config)
 init_per_testcase(TestCase, Config) ->
     CertDir = cert_dir(),
     Apps = grisp_connect_test_server:start(#{cert_dir => CertDir}),
-    {ok, _} = application:ensure_all_started(grisp_emulation),
     {ok, _} = application:ensure_all_started(grisp_connect),
     case TestCase of
         auto_connect_test -> ok;
@@ -78,7 +77,6 @@ exponential_backoff_test(_) ->
             {ok, cowboy_req:reply(400, #{}, <<"Canceled">>, Req), Opts}
         end}),
 
-    {ok, _} = application:ensure_all_started(grisp_emulation),
     application:load(grisp_connect),
     {ok, OldConectEnv} = application:get_env(grisp_connect, connect),
     application:set_env(grisp_connect, connect, false),
@@ -204,7 +202,6 @@ bad_client_version_test(_) ->
         cert_dir => CertDir,
         expected_protocol => <<"grisp-io-v42">>}),
     try
-        {ok, _} = application:ensure_all_started(grisp_emulation),
         application:load(grisp_connect),
         {ok, OldMaxRetryEnv} = application:get_env(grisp_connect, ws_max_retries),
         application:set_env(grisp_connect, ws_max_retries, 2),
@@ -228,7 +225,6 @@ bad_server_version_test(_) ->
         cert_dir => CertDir,
         selected_protocol => <<"grisp-io-v42">>}),
     try
-        {ok, _} = application:ensure_all_started(grisp_emulation),
         application:load(grisp_connect),
         {ok, OldMaxRetryEnv} = application:get_env(grisp_connect, ws_max_retries),
         application:set_env(grisp_connect, ws_max_retries, 2),
