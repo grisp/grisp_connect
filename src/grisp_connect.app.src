@@ -10,7 +10,6 @@
         public_key,
         jsx,
         jarl,
-        certifi,
         grisp_keychain
     ]},
     {optional_applications, [
