@@ -33,11 +33,11 @@ verify_server(OtpCert, _Event, _State) ->
 -doc """
 Identical to the default verify_fun, but ignores the cert_expired failure.
 """.
-skip_cert_expired(_,{bad_cert, cert_expired} = Reason, UserState) ->
+skip_cert_expired(_, {bad_cert, cert_expired}, UserState) ->
     {valid, UserState};
-skip_cert_expired(_,{bad_cert, _} = Reason, _) ->
+skip_cert_expired(_, {bad_cert, _} = Reason, _) ->
     {fail, Reason};
-skip_cert_expired(_,{extension, _}, UserState) ->
+skip_cert_expired(_, {extension, _}, UserState) ->
     {unknown, UserState};
 skip_cert_expired(_, valid, UserState) ->
     {valid, UserState};
