@@ -27,7 +27,10 @@ make sure to add `grisp_updater_grisp2` as a dependency in your project as well.
     - [`ws_ping_timeout`](#ws_ping_timeout)
     - [`logs_interval`](#logs_interval)
     - [`logs_batch_size`](#logs_batch_size)
-    - [Custom TLS options](#custom-tls-options)
+  - [grisp\_keychain](#grisp_keychain)
+    - [Use a specific backend](#use-a-specific-backend)
+    - [Development options](#development-options)
+      - [`allow_expired_certs`](#allow_expired_certs)
   - [See all Logs on GRiSP.io](#see-all-logs-on-grispio)
   - [Development](#development)
     - [Local Development](#local-development)
@@ -141,21 +144,57 @@ Sets the intervall between each log batch dispatch to grisp.io.
 
 Accepts an integer that represents the maximum number of logs that can be batched together, default value is `100`.
 
-### Custom TLS options
+## grisp_keychain
 
-TLS settings are managed through the [grisp_cryptoauth TLS options](https://github.com/grisp/grisp_cryptoauth?tab=readme-ov-file#configuring-tls-options).
+To be able to connect securely with our backend you need to correctly setup certificates and keys access through `grisp_keychain` enviroment.
 
-grisp_connect sets the following options as default values if no `tls_server_trusted_certs_cb` is setup. Refer to the `grisp_cryptoauth` README in case you want to overrride the default `certifi` CAs.
+This can variate greatly depending on the platfrom and usecase of your deployment.
+To correctly setup a new project, please use our [rebar3_grisp plugin](https://github.com/grisp/rebar3_grisp?tab=readme-ov-file#create-new-application).
+
+TLS settings are fetched through the [grisp_keychain app](https://github.com/grisp/grisp_keychain). This app defaults to use a simple file filesystem access and requires additional informations to locate the certificates.
+
+In this example we use `grisp_keychain` alone. Relying on free filesystem access.
+We are using certifi CAs and a device certificate and key we have in priv.
 
 ```erlang
     % Example sys.config
     [
         ...
+        {grisp_keychain, [
+            {api_module, grisp_keychain_filesystem}, % default
+            {tls_server_trusted_certs_cb, {certifi, cacerts, []}},
+            {client_certs, {priv, myapp, "certs/device.pem"}},
+            {client_key, {priv, myapp, "certs/device.key"}}
+        ]}
+    ]
+```
+
+### Use a specific backend
+
+For production usecases we are developing backends to securely access certificates and keys.
+
+For example: if you are using GRiSP2 you will need `grisp_cryptoauth` to use secrets held by the secure element. See the [grisp_cryptoauth TLS options](https://github.com/grisp/grisp_cryptoauth?tab=readme-ov-file#configuring-tls-options) to customize them. A simple configuration that uses secure element certs and `certifi` as CA provider will look like this:
+
+```erlang
+
+    % Example sys.config
+    [
+        ...
+        {grisp_keychain, [
+            {api_module, grisp_cryptoauth}
+        ]},
         {grisp_cryptoauth, [
             {tls_server_trusted_certs_cb, {certifi, cacerts, []}}
         ]}
     ]
 ```
+Note: we do not depend on `certifi`, make sure it is added to your deps in case you want to use it.
+
+### Development options
+
+#### `allow_expired_certs`
+
+`grisp_connect` will ignore `cert_expired` errors during certificate path validation. This should only be used for development. Default is `false`.
 
 ## See all Logs on GRiSP.io
 
@@ -229,6 +268,8 @@ log handler:
 
 Add an entry in your local hosts file so the domain www.seawater.local points
 to your local development server.
+
+Make sure you have the proper certificates under `prinv/server` and `priv/client`. Refer to the backend private docs on how to generate the certificates.
 
 Start a local development shell:
 

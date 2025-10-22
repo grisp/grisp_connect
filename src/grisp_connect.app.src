@@ -10,12 +10,7 @@
         public_key,
         jsx,
         jarl,
-        grisp,
-        grisp_cryptoauth,
-        certifi
-    ]},
-    {optional_applications, [
-        grisp_updater_grisp2
+        grisp_keychain
     ]},
     {env, [
         {domain, "devices.grisp.io"},
@@ -29,7 +24,9 @@
         {ws_request_timeout, 5_000},
         {ws_ping_timeout, 60_000},
         {ws_max_retries, infinity},
+        {allow_expired_certs, false},
         % Must be writable and match the cacertfile in ssl_dist_opts.rel
+        {board_certificate, "/etc/board.pem"},
         {allowed_ca_chain, "/etc/peers.CA.pem"},
         {logs_batch_size, 100},
         {logger, [

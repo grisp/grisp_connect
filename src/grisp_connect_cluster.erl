@@ -6,8 +6,6 @@
 %--- Includes -------------------------------------------------------------------
 
 -include_lib("kernel/include/logger.hrl").
--include_lib("grisp/include/grisp.hrl").
-
 
 %--- Exports -------------------------------------------------------------------
 
@@ -200,14 +198,11 @@ optional(bool, Default, Key, Map) ->
     end.
 
 store_board_certs(State) ->
-    case ?IS_EMULATED of
-        true -> State;
-        false ->
-            DerCert = grisp_cryptoauth:read_cert(primary, der),
-            PemCert = der_list_to_pem([DerCert]),
-            ok = file:write_file("/etc/board.pem", PemCert),
-            State
-    end.
+    DerCert = grisp_keychain:read_cert(primary, der),
+    PemCert = der_list_to_pem([DerCert]),
+    {ok, Filename} = application:get_env(grisp_connect, board_certificate),
+    ok = file:write_file(Filename, PemCert),
+    State.
 
 store_ca_certs(State = #state{peers = Peers}) ->
     {ok, Filename} = application:get_env(grisp_connect, allowed_ca_chain),

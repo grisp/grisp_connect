@@ -75,7 +75,6 @@ init_per_testcase(log_level_test, Config) ->
     logger:set_primary_config(level, debug),
     init_per_testcase(other, [{default_level, Level} | Config]);
 init_per_testcase(_, Config) ->
-    {ok, _} = application:ensure_all_started(grisp_emulation),
     {ok, _} = application:ensure_all_started(grisp_connect),
     ?assertEqual(ok, wait_connection()),
     grisp_connect_test_server:listen(),

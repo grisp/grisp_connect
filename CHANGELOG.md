@@ -8,6 +8,21 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Changed
+
+- Replace `grisp` and `grisp_cryptoauth` dependencies with `grisp_keychain`
+- Use `grisp_keychain` to get TLS options and manage cluster certificates
+- Cleanup configuration files and test suites
+- Update local profile with improved documentation
+
+### Added
+
+- Add option to enable custom verify_fun that skips certificate expiration errors
+
+### Removed
+
+- Remove certifi dependency
+
 ## [2.1.0] - 2025-03-12
 
 ### Changed
@@ -81,7 +96,7 @@ disconnected from the server.
 - Start integrating grisp updater.
 
 [Unreleased]: https://github.com/grisp/grisp_connect/compare/2.1.0...HEAD
-[2.01.0]: https://github.com/grisp/grisp_connect/compare/2.0.0...2.1.0
+[2.1.0]: https://github.com/grisp/grisp_connect/compare/2.0.0...2.1.0
 [2.0.0]: https://github.com/grisp/grisp_connect/compare/1.1.0...2.0.0
 [1.1.0]: https://github.com/grisp/grisp_connect/compare/1.0.0...1.1.0
 [1.0.0]: https://github.com/grisp/grisp_connect/compare/6b59d16383b3e5154ef839bcf5c77a6b770aada5...1.0.0
