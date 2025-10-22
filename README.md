@@ -233,6 +233,8 @@ log handler:
 Add an entry in your local hosts file so the domain www.seawater.local points
 to your local development server.
 
+Make sure you have the proper certificates under `prinv/server` and `priv/client`. Refer to the backend private docs on how to generate the certificates.
+
 Start a local development shell:
 
     rebar3 as local shell
