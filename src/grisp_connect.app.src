@@ -12,9 +12,6 @@
         jarl,
         grisp_keychain
     ]},
-    {optional_applications, [
-        grisp_updater_grisp2
-    ]},
     {env, [
         {domain, "devices.grisp.io"},
         {port, 443},
