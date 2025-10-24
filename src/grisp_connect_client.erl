@@ -25,7 +25,7 @@
 
 % State Functions
 -export([idle/3]).
--export([waiting_ip/3]).
+-export([waiting_network/3]).
 -export([connecting/3]).
 -export([connected/3]).
 
@@ -127,7 +127,7 @@ init([]) ->
     % The error list is put in a persistent term to not add noise to the state.
     persistent_term:put({?MODULE, self()}, generic_errors()),
     NextState = case AutoConnect of
-        true -> waiting_ip;
+        true -> waiting_network;
         false -> idle
     end,
     {ok, NextState, Data}.
@@ -152,17 +152,17 @@ idle(enter, _OldState,
 idle({call, From}, wait_connected, _) ->
     {keep_state_and_data, [{reply, From, {error, not_connecting}}]};
 idle(cast, connect, Data) ->
-    {next_state, waiting_ip, Data};
+    {next_state, waiting_network, Data};
 ?HANDLE_COMMON.
 
-% @doc State waiting_ip is used to check the device has an IP address.
+% @doc State waiting_network is used to check the device has an IP address.
 % The first time entering this state, the check will be performed right away.
 % If the device do not have an IP address, it will wait a fixed amount of time
 % and check again, without incrementing the retry counter.
-waiting_ip(enter, _OldState, _Data) ->
+waiting_network(enter, _OldState, _Data) ->
     % First IP check do not have any delay
     {keep_state_and_data, [{state_timeout, 0, check_ip}]};
-waiting_ip(state_timeout, check_ip, Data) ->
+waiting_network(state_timeout, check_ip, Data) ->
     case grisp_connect_utils:check_inet_ipv4() of
         {ok, IP} ->
             ?LOG_DEBUG(#{description => ?FORMAT("IP Address available: ~s",
@@ -171,7 +171,7 @@ waiting_ip(state_timeout, check_ip, Data) ->
             {next_state, connecting, Data};
         invalid ->
             ?LOG_DEBUG(#{description => <<"Waiting for an IP address do connect to grisp.io">>,
-                         event => waiting_ip}),
+                         event => waiting_network}),
             {keep_state_and_data, [{state_timeout, 1000, check_ip}]}
     end;
 ?HANDLE_COMMON.
@@ -331,7 +331,7 @@ reconnect(Data = #data{retry_count = RetryCount, last_error = LastError},
     % When reconnecting we always increment the retry counter, even if we
     % where connected and it was reset to 0, the next step will always be
     % retry number 1. It should never reconnect right away.
-    {next_state, waiting_ip,
+    {next_state, waiting_network,
      Data#data{retry_count = RetryCount + 1, last_error = Error}}.
 
 % Connection Functions
