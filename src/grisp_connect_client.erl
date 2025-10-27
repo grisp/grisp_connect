@@ -19,6 +19,8 @@
 
 % Internal API
 -export([reboot/0]).
+-export([lan_connected/0]).
+-export([lan_disconnected/0]).
 
 % Behaviour gen_statem callback functions
 -export([init/1, terminate/3, code_change/4, callback_mode/0]).
@@ -106,6 +108,11 @@ notify(Method, Type, Params) ->
 reboot() ->
     erlang:send_after(1000, ?MODULE, reboot).
 
+lan_connected() ->
+    gen_statem:cast(?MODULE, ?FUNCTION_NAME).
+
+lan_disconnected() ->
+    gen_statem:cast(?MODULE, ?FUNCTION_NAME).
 
 %--- Behaviour gen_statem Callback Functions -----------------------------------
 
@@ -134,8 +141,7 @@ init([]) ->
 
 terminate(Reason, _State, Data) ->
     conn_close(Data, Reason),
-    persistent_term:erase({?MODULE, self()}),
-    ok.
+    persistent_term:erase({?MODULE, self()}).
 
 code_change(_Vsn, State, Data, _Extra) -> {ok, State, Data}.
 
@@ -160,8 +166,23 @@ idle(cast, connect, Data) ->
 % If the device do not have an IP address, it will wait a fixed amount of time
 % and check again, without incrementing the retry counter.
 waiting_network(enter, _OldState, _Data) ->
-    % First IP check do not have any delay
-    {keep_state_and_data, [{state_timeout, 0, check_ip}]};
+    Actions = case grisp_connect_utils:using_grisp_netman() of
+        true ->
+            case grisp_netman:connection_status() of
+                S when S =:= lan orelse S =:= internet ->
+                    ?MODULE:lan_connected();
+                disconnected ->
+                    ok
+            end,
+            [];
+        _ ->
+            [{state_timeout, 0, check_ip}]
+    end,
+    {keep_state_and_data, Actions};
+waiting_network(cast, lan_connected, Data) ->
+    ?LOG_DEBUG(#{description => <<"Connected to LAN">>,
+                 event => lan_connected}),
+    {next_state, connecting, Data};
 waiting_network(state_timeout, check_ip, Data) ->
     case grisp_connect_utils:check_inet_ipv4() of
         {ok, IP} ->
@@ -225,6 +246,15 @@ connected(cast, {notify, Method, Type, Params}, Data) ->
 % Common event handling appended as last match case to each state_function
 handle_common(cast, connect, State, _Data) when State =/= idle ->
     keep_state_and_data;
+handle_common(cast, lan_connected, State, _Data)
+when State =/= waiting_network ->
+    keep_state_and_data;
+handle_common(cast, lan_disconnected, State, Data)
+when State =/= idle, State =/= waiting_network ->
+    Reason = lan_disconnected,
+    ?LOG_WARNING(#{description => <<"LAN connection lost">>,
+                   event => lan_disconnected}),
+    reconnect(conn_close(Data, Reason), Reason);
 handle_common({call, From}, is_connected, State, _) when State =/= connected ->
     {keep_state_and_data, [{reply, From, false}]};
 handle_common({call, From}, wait_connected, _State,

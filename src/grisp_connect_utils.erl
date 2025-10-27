@@ -4,11 +4,16 @@
 %--- Exports -------------------------------------------------------------------
 
 % API functions
+-export([using_grisp_netman/0]).
 -export([retry_delay/1]).
 -export([check_inet_ipv4/0]).
 
 
 %--- API Functions -------------------------------------------------------------
+
+using_grisp_netman() ->
+    RunningApps = application:which_applications(),
+    lists:keymember(grisp_netman, 1, RunningApps).
 
 check_inet_ipv4() ->
     case get_ip_of_valid_interfaces() of
