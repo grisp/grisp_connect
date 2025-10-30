@@ -19,13 +19,15 @@
 
 % Internal API
 -export([reboot/0]).
+-export([lan_connected/0]).
+-export([lan_disconnected/0]).
 
 % Behaviour gen_statem callback functions
 -export([init/1, terminate/3, code_change/4, callback_mode/0]).
 
 % State Functions
 -export([idle/3]).
--export([waiting_ip/3]).
+-export([waiting_network/3]).
 -export([connecting/3]).
 -export([connected/3]).
 
@@ -106,6 +108,11 @@ notify(Method, Type, Params) ->
 reboot() ->
     erlang:send_after(1000, ?MODULE, reboot).
 
+lan_connected() ->
+    gen_statem:cast(?MODULE, ?FUNCTION_NAME).
+
+lan_disconnected() ->
+    gen_statem:cast(?MODULE, ?FUNCTION_NAME).
 
 %--- Behaviour gen_statem Callback Functions -----------------------------------
 
@@ -127,15 +134,14 @@ init([]) ->
     % The error list is put in a persistent term to not add noise to the state.
     persistent_term:put({?MODULE, self()}, generic_errors()),
     NextState = case AutoConnect of
-        true -> waiting_ip;
+        true -> waiting_network;
         false -> idle
     end,
     {ok, NextState, Data}.
 
 terminate(Reason, _State, Data) ->
     conn_close(Data, Reason),
-    persistent_term:erase({?MODULE, self()}),
-    ok.
+    persistent_term:erase({?MODULE, self()}).
 
 code_change(_Vsn, State, Data, _Extra) -> {ok, State, Data}.
 
@@ -152,17 +158,32 @@ idle(enter, _OldState,
 idle({call, From}, wait_connected, _) ->
     {keep_state_and_data, [{reply, From, {error, not_connecting}}]};
 idle(cast, connect, Data) ->
-    {next_state, waiting_ip, Data};
+    {next_state, waiting_network, Data};
 ?HANDLE_COMMON.
 
-% @doc State waiting_ip is used to check the device has an IP address.
+% @doc State waiting_network is used to check the device has an IP address.
 % The first time entering this state, the check will be performed right away.
 % If the device do not have an IP address, it will wait a fixed amount of time
 % and check again, without incrementing the retry counter.
-waiting_ip(enter, _OldState, _Data) ->
-    % First IP check do not have any delay
-    {keep_state_and_data, [{state_timeout, 0, check_ip}]};
-waiting_ip(state_timeout, check_ip, Data) ->
+waiting_network(enter, _OldState, _Data) ->
+    Actions = case grisp_connect_utils:using_grisp_netman() of
+        true ->
+            case grisp_netman:connection_status() of
+                S when S =:= lan orelse S =:= internet ->
+                    ?MODULE:lan_connected();
+                disconnected ->
+                    ok
+            end,
+            [];
+        _ ->
+            [{state_timeout, 0, check_ip}]
+    end,
+    {keep_state_and_data, Actions};
+waiting_network(cast, lan_connected, Data) ->
+    ?LOG_DEBUG(#{description => <<"Connected to LAN">>,
+                 event => lan_connected}),
+    {next_state, connecting, Data};
+waiting_network(state_timeout, check_ip, Data) ->
     case grisp_connect_utils:check_inet_ipv4() of
         {ok, IP} ->
             ?LOG_DEBUG(#{description => ?FORMAT("IP Address available: ~s",
@@ -171,7 +192,7 @@ waiting_ip(state_timeout, check_ip, Data) ->
             {next_state, connecting, Data};
         invalid ->
             ?LOG_DEBUG(#{description => <<"Waiting for an IP address do connect to grisp.io">>,
-                         event => waiting_ip}),
+                         event => waiting_network}),
             {keep_state_and_data, [{state_timeout, 1000, check_ip}]}
     end;
 ?HANDLE_COMMON.
@@ -225,6 +246,15 @@ connected(cast, {notify, Method, Type, Params}, Data) ->
 % Common event handling appended as last match case to each state_function
 handle_common(cast, connect, State, _Data) when State =/= idle ->
     keep_state_and_data;
+handle_common(cast, lan_connected, State, _Data)
+when State =/= waiting_network ->
+    keep_state_and_data;
+handle_common(cast, lan_disconnected, State, Data)
+when State =/= idle, State =/= waiting_network ->
+    Reason = lan_disconnected,
+    ?LOG_WARNING(#{description => <<"LAN connection lost">>,
+                   event => lan_disconnected}),
+    reconnect(conn_close(Data, Reason), Reason);
 handle_common({call, From}, is_connected, State, _) when State =/= connected ->
     {keep_state_and_data, [{reply, From, false}]};
 handle_common({call, From}, wait_connected, _State,
@@ -331,7 +361,7 @@ reconnect(Data = #data{retry_count = RetryCount, last_error = LastError},
     % When reconnecting we always increment the retry counter, even if we
     % where connected and it was reset to 0, the next step will always be
     % retry number 1. It should never reconnect right away.
-    {next_state, waiting_ip,
+    {next_state, waiting_network,
      Data#data{retry_count = RetryCount + 1, last_error = Error}}.
 
 % Connection Functions
