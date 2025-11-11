@@ -196,6 +196,18 @@ Note: we do not depend on `certifi`, make sure it is added to your deps in case 
 
 `grisp_connect` will ignore `cert_expired` errors during certificate path validation. This should only be used for development. Default is `false`.
 
+```erlang
+    % Example sys.config
+    [
+        ...
+        {grisp_keychain, [
+            ...
+            {allow_expired_certs, true},
+            ...
+        ]}
+    ]
+```
+
 ## See all Logs on GRiSP.io
 
 Once this app is started, it forwards all logs to GRiSP.io without the need of setting up anything. The only logs that we do not catch are the ones generated before `grisp_connect` boots.

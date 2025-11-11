@@ -9,7 +9,6 @@
 
 % API functions
 -export([verify_server/3]).
--export([skip_cert_expired/3]).
 
 
 %--- API Functions -------------------------------------------------------------
@@ -29,17 +28,3 @@ verify_server(OtpCert, _Event, _State) ->
         true -> {valid, Hash};
         false -> {fail, not_allowed}
     end.
-
--doc """
-Identical to the default verify_fun, but ignores the cert_expired failure.
-""".
-skip_cert_expired(_, {bad_cert, cert_expired}, UserState) ->
-    {valid, UserState};
-skip_cert_expired(_, {bad_cert, _} = Reason, _) ->
-    {fail, Reason};
-skip_cert_expired(_, {extension, _}, UserState) ->
-    {unknown, UserState};
-skip_cert_expired(_, valid, UserState) ->
-    {valid, UserState};
-skip_cert_expired(_, valid_peer, UserState) ->
-    {valid, UserState}.
