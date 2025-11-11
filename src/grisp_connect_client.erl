@@ -404,10 +404,4 @@ conn_error(Data, Code, Message, ErData, ReqRef) ->
     conn_error(Data, Code, Message, BinErData, ReqRef).
 
 tls_options(Domain) ->
-    ExtraOpts = case application:get_env(grisp_connect, allow_expired_certs) of
-        {ok, false} -> [];
-        {ok, true} ->
-            [{verify_fun,
-                {fun grisp_connect_crypto:skip_cert_expired/3, []}}]
-    end,
-    grisp_keychain:tls_options(Domain) ++ ExtraOpts.
+    grisp_keychain:tls_options(Domain).
