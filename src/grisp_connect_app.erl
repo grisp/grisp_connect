@@ -20,13 +20,18 @@ start(_StartType, _StartArgs) ->
     logger:add_handlers(grisp_connect),
     case grisp_connect_utils:using_grisp_netman() of
         true ->
-            grisp_connect_netman:add_handler();
+            grisp_netman:add_event_handler(grisp_connect_netman_handler, []);
         false ->
             ok
     end,
     grisp_connect_sup:start_link().
 
 stop(_State) ->
-    ok.
+    case grisp_connect_utils:using_grisp_netman() of
+        true ->
+            grisp_netman:delete_event_handler(grisp_connect_netman_handler, []);
+        false ->
+            ok
+    end.
 
 %--- Internal Functions --------------------------------------------------------
