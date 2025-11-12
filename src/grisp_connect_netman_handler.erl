@@ -1,21 +1,17 @@
--module(grisp_connect_netman).
+-module(grisp_connect_netman_handler).
+-moduledoc """
+Handler for grisp_netman events.
+""".
 
 -behaviour(gen_event).
 
--export([add_handler/0, remove_handler/0]).
 -export([init/1, handle_event/2, handle_call/2]).
 
 -include_lib("kernel/include/logger.hrl").
 
-add_handler() ->
-    gen_event:add_handler(grisp_netman_event, ?MODULE, []).
-
-remove_handler() ->
-    gen_event:delete_handler(grisp_netman_event, ?MODULE, []).
-
 % Behaviour gen_event callbacks ------------------------------------------------
 
-init([]) ->
+init(_) ->
     {ok, #{}}.
 
 handle_event({connection_status, _IfName, Status}, State) ->
@@ -36,5 +32,5 @@ handle_event({connection_status, _IfName, Status}, State) ->
     {ok, State}.
 
 handle_call(Request, State) ->
-    ?LOG_WARNING("Unexpected grisp_netman_event call: ~p", [Request]),
+    ?LOG_WARNING("Unexpected ~p call: ~p", [?MODULE, Request]),
     {reply, unexpected_call, State}.
