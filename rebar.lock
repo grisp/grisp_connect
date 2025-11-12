@@ -2,7 +2,7 @@
 [{<<"cowlib">>,{pkg,<<"cowlib">>,<<"2.13.0">>},2},
  {<<"grisp_keychain">>,
   {git,"https://github.com/grisp/grisp_keychain.git",
-       {ref,"e63f917ee771acb3fe6b7e1eacbaea8c175d76f5"}},
+       {ref,"4590293b7c0502638ca225f47e7849aa3bb004c1"}},
   0},
  {<<"gun">>,{pkg,<<"gun">>,<<"2.1.0">>},1},
  {<<"jarl">>,{pkg,<<"jarl">>,<<"1.1.0">>},0},
