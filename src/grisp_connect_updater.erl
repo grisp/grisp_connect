@@ -149,16 +149,17 @@ update_info() ->
                           action_required => remove_sdcard_and_reboot};
                 % Updated and rebooted
                 {ready,
-                 #{type := system, id := TestId} = Boot,
+                 #{type := system, id := BootId} = Boot,
                  #{type := system, id := ValidId},
-                 #{type := system, id := NextId}}
-                    when ValidId =/= TestId, ValidId =:= NextId ->
+                 _}
+                    when ValidId =/= BootId ->
                         #{update_enabled => true,
                           boot_source => Boot,
                           update_status => updated,
                           update_message => <<"Device updated, validation required">>,
                           action_required => validate};
-                _ ->
+                StatusInfo ->
+                    ?LOG_WARNING("Updater info is not supported: ~p", [StatusInfo]),
                     #{update_enabled => true}
             end
     end.
