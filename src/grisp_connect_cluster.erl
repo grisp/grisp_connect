@@ -327,7 +327,11 @@ register_peer(Peer = #peer{node = Node, cookie = Cookie,
 % We need the full state to be sure to not remove an address used by another peer
 unregister_peer(#state{peers = Peers},
                 Peer = #peer{node = Node, fingerprint = Fingerprint,
-                             address = Address}) ->
+                             address = Address, timer_ref = TimerRef}) ->
+    case TimerRef of
+        undefined -> ok;
+        _ -> erlang:cancel_timer(TimerRef)
+    end,
     ets:delete(?FINGERPRINT_TABLE, Fingerprint),
     SameAddr = [N || #peer{node = N, address = A} <- maps:values(Peers),
                      N =/= Node, A =:= Address],
