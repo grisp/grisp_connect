@@ -35,7 +35,7 @@
     address :: inet: ip4_address(),
     cookie :: atom(),
     ca :: binary(),
-    fingerprint :: binary(),
+    fingerprint :: [binary()] | binary(),
     monitor :: boolean(),
     timer_ref :: undefined | reference()
 }).
@@ -49,7 +49,7 @@
     address := inet:ip4_address(),
     cookie := atom(),
     ca := binary(),
-    fingerprint := binary(),
+    fingerprint := [binary()],
     monitor => boolean()
 }.
 
@@ -59,7 +59,7 @@
 -define(SERVER, ?MODULE).
 -define(RETRY_DELAY, 1000). % ms
 -define(FORMAT(FMT, ARGS), iolist_to_binary(io_lib:format(FMT, ARGS))).
--define(FINGERPRINT_TABLE, grisp_connect_cluster_fingerprints).
+-define(FINGERPRINT_TABLE, grisp_connect_cluster_fingerprint).
 
 
 %--- API FUNCTIONS -------------------------------------------------------------
@@ -161,16 +161,38 @@ required(atom, Key, Map) ->
         {ok, V} when is_atom(V) -> V;
         _ -> error(badarg)
     end;
+required(atom, Key, Map) ->
+    case maps:find(Key, Map) of
+        {ok, V} when is_atom(V) -> V;
+        _ -> error(badarg)
+    end;
 required(binary, Key, Map) ->
     case maps:find(Key, Map) of
         {ok, V} when is_binary(V) -> V;
         _ -> error(badarg)
     end;
-required(fingerprint, Key, Map) ->
+required(list, Key, Map) ->
+    case maps:find(Key, Map) of
+        {ok, V} when is_list(V) -> V;
+        _ -> error(badarg)
+    end;
+required(fingerprint_binary, Key, Map) ->
     V = required(binary, Key, Map),
     case byte_size(V) of
         32 -> V;
         _ -> error(badarg)
+    end;
+required(fingerprint_list, Key, Map) ->
+    V = required(list, Key, Map),
+    case lists:all(fun(F) -> is_binary(F) andalso byte_size(F) =:= 32 end, V) of
+        true -> V;
+        false -> error(badarg)
+    end;
+required(fingerprint, Key, Map) ->
+    try
+       required(fingerprint_binary, Key, Map)
+    catch error:badarg ->
+        required(fingerprint_list, Key, Map)
     end;
 required(pem, Key, Map) ->
     case maps:find(Key, Map) of
@@ -318,7 +340,12 @@ schedule_retry(Peer = #peer{timer_ref = Ref}) ->
 register_peer(Peer = #peer{node = Node, cookie = Cookie,
                            fingerprint = Fingerprint,
                            hostname = Hostname, address = Address}) ->
-    ets:insert(?FINGERPRINT_TABLE, {Fingerprint, Node}),
+    case is_list(Fingerprint) of
+        true ->
+            [ets:insert(?FINGERPRINT_TABLE, {F, Node}) || F <- Fingerprint];
+        false ->
+            ets:insert(?FINGERPRINT_TABLE, {Fingerprint, Node})
+    end,
     inet_db:add_host(Address, [binary_to_list(Hostname)]),
     erlang:set_cookie(Node, Cookie),
     net_kernel:allow([Node]),
