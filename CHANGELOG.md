@@ -8,20 +8,26 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-02-20
+
+### Added
+
+- This library is now generic and can run on any platform which supports Erlang
+- Add option `allow_expired_certs` to enable custom verify_fun that skips certificate expiration errors
+
 ### Changed
 
+- grisp_connect is now generic and not exclusively tied to run on GRiSP2 boards
 - Replace `grisp` and `grisp_cryptoauth` dependencies with `grisp_keychain`
 - Use `grisp_keychain` to get TLS options and manage cluster certificates
 - Cleanup configuration files and test suites
 - Update local profile with improved documentation
 
-### Added
-
-- Add option to enable custom verify_fun that skips certificate expiration errors
-
 ### Removed
 
-- Remove certifi dependency
+- Removed certifi
+- Removed grisp_cryptoauth
+- Removed grisp
 
 ## [2.1.0] - 2025-03-12
 
@@ -95,7 +101,8 @@ disconnected from the server.
 - Use grisp_cryptoauth TLS helper to generate TLS options.
 - Start integrating grisp updater.
 
-[Unreleased]: https://github.com/grisp/grisp_connect/compare/2.1.0...HEAD
+[Unreleased]: https://github.com/grisp/grisp_connect/compare/2.2.0...HEAD
+[2.2.0]: https://github.com/grisp/grisp_connect/compare/2.1.0...2.2.0
 [2.1.0]: https://github.com/grisp/grisp_connect/compare/2.0.0...2.1.0
 [2.0.0]: https://github.com/grisp/grisp_connect/compare/1.1.0...2.0.0
 [1.1.0]: https://github.com/grisp/grisp_connect/compare/1.0.0...1.1.0
