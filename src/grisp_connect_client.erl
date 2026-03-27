@@ -267,7 +267,7 @@ handle_common(cast, {notify, _Method, _Type, _Params}, _State, _Data) ->
     % We ignore notifications sent while disconnected
     keep_state_and_data;
 handle_common(info, reboot, _, _) ->
-    init:stop(),
+    grisp_connect_utils:reboot(),
     keep_state_and_data;
 handle_common(info, {'EXIT', Conn, Reason}, _State, Data = #data{conn = Conn}) ->
     RealReason = case Reason of

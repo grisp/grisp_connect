@@ -5,6 +5,7 @@
 
 % API functions
 -export([using_grisp_netman/0]).
+-export([reboot/0]).
 -export([retry_delay/1]).
 -export([check_inet_ipv4/0]).
 
@@ -14,6 +15,19 @@
 using_grisp_netman() ->
     RunningApps = application:which_applications(),
     lists:keymember(grisp_netman, 1, RunningApps).
+
+reboot() ->
+    case application:get_env(grisp_connect, reboot_cb) of
+        undefined ->
+            init:stop();
+        {ok, undefined} ->
+            init:stop();
+        {ok, {Module, Function}}
+          when is_atom(Module), is_atom(Function) ->
+            Module:Function();
+        {ok, Value} ->
+            error({invalid_env, reboot_cb, Value})
+    end.
 
 check_inet_ipv4() ->
     case get_ip_of_valid_interfaces() of
