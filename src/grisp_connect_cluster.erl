@@ -201,6 +201,7 @@ store_board_certs(State) ->
     DerCert = grisp_keychain:read_cert(primary, der),
     PemCert = der_list_to_pem([DerCert]),
     {ok, Filename} = application:get_env(grisp_connect, board_certificate),
+    ok = filelib:ensure_dir(Filename),
     ok = file:write_file(Filename, PemCert),
     State.
 
@@ -208,6 +209,7 @@ store_ca_certs(State = #state{peers = Peers}) ->
     {ok, Filename} = application:get_env(grisp_connect, allowed_ca_chain),
     CAPemItems = unique([P#peer.ca || P <- maps:values(Peers)]),
     Data = lists:join("\n", CAPemItems),
+    ok = filelib:ensure_dir(Filename),
     ok = file:write_file(Filename, Data),
     clear_dist_pem_cache(),
     State.
