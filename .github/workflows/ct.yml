@@ -16,7 +16,7 @@ jobs:
     strategy:
       matrix:
         otp: ['28', '27']
-        rebar3: ['3.25.1']
+        rebar3: ['3.28.0']
     steps:
       - uses: erlef/setup-beam@v1
         with:
