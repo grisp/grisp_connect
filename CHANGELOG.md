@@ -8,6 +8,30 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-11-26
+
+### Added
+
+- Add the grisp_connect release workflow (#77)
+- Add reboot callback
+
+
+### Changed
+
+- Update CI and deps (#76)
+- Update vulnerable Erlang dependencies (#75)
+
+
+### Fixed
+
+- Ensure directories before writing cluster related files
+- Fix Changelog links
+
+
+### Security
+
+- Add GitHub Actions workflow for zizmor security analysis
+
 ## [3.0.0] - 2026-02-20
 
 ### Added
@@ -101,7 +125,8 @@ disconnected from the server.
 - Use grisp_cryptoauth TLS helper to generate TLS options.
 - Start integrating grisp updater.
 
-[Unreleased]: https://github.com/grisp/grisp_connect/compare/3.0.0...HEAD
+[Unreleased]: https://github.com/grisp/grisp_connect/compare/3.1.0...HEAD
+[3.1.0]: https://github.com/grisp/grisp_connect/compare/3.0.0...3.1.0
 [3.0.0]: https://github.com/grisp/grisp_connect/compare/2.1.0...3.0.0
 [2.1.0]: https://github.com/grisp/grisp_connect/compare/2.0.0...2.1.0
 [2.0.0]: https://github.com/grisp/grisp_connect/compare/1.1.0...2.0.0
